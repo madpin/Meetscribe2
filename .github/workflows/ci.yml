@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Check template status
+      id: template_check
+      shell: bash
+      run: |
+        if grep -q "{{.*}}" pyproject.toml; then
+          echo "is_template=true" >> $GITHUB_OUTPUT
+          echo "📋 Running in TEMPLATE MODE - placeholders found"
+        else
+          echo "is_template=false" >> $GITHUB_OUTPUT
+          echo "✅ Running in INSTANTIATED MODE - no placeholders"
+        fi
+
+    - name: Install dependencies (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Install dependencies (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      run: |
+        python -m pip install --upgrade pip
+        # Install dev dependencies individually since package can't be installed with placeholders
+        pip install typer rich pynput pyautogui pyperclip requests Pillow python-daemon toml pytest pyinstaller ruff
+
+    - name: Lint with ruff
+      run: |
+        python -m ruff check app/ tests/ --select=E9,F --statistics
+        python -m ruff check app/ tests/ --exit-zero --line-length=127 --statistics
+
+    - name: Run tests (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      run: |
+        python -m pytest --cov=app --cov-report=xml --cov-report=term-missing
+
+    - name: Run tests (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      run: |
+        python -m pytest --tb=short -v
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  build:
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            template_build_cmd: pyinstaller aio_terminal_template.spec
+            template_test_cmd: ./dist/aio_terminal_template --help
+            build_cmd: pyinstaller aio_terminal_template.spec
+            test_cmd: ./dist/aio_terminal_template --help
+          - os: macos-latest
+            template_build_cmd: python scripts/build_signed.py --no-sign
+            template_test_cmd: ./dist/aio_terminal_template --help
+            build_cmd: python scripts/build_signed.py
+            test_cmd: ./dist/aio_terminal_template --help
+          - os: windows-latest
+            template_build_cmd: pyinstaller aio_terminal_template.spec
+            template_test_cmd: ./dist/aio_terminal_template.exe --help
+            build_cmd: pyinstaller aio_terminal_template.spec
+            test_cmd: ./dist/aio_terminal_template.exe --help
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Check template status
+      id: template_check
+      shell: bash
+      run: |
+        if grep -q "{{.*}}" pyproject.toml; then
+          echo "is_template=true" >> $GITHUB_OUTPUT
+          echo "📋 Running in TEMPLATE MODE - placeholders found"
+        else
+          echo "is_template=false" >> $GITHUB_OUTPUT
+          echo "✅ Running in INSTANTIATED MODE - no placeholders"
+        fi
+
+    - name: Install dependencies (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+
+    - name: Install dependencies (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      run: |
+        python -m pip install --upgrade pip
+        pip install typer rich pynput pyautogui pyperclip requests Pillow python-daemon toml pyinstaller
+
+    - name: Verify build requirements
+      run: |
+        # Verify we have all required files for building
+        if [ ! -f "aio_terminal_template.spec" ]; then
+          echo "❌ ERROR: aio_terminal_template.spec not found"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
+        
+        if [ ! -f "app/cli.py" ]; then
+          echo "❌ ERROR: app/cli.py not found"
+          exit 1
+        fi
+        
+        if [ ! -d "scripts" ]; then
+          echo "❌ ERROR: scripts directory not found"
+          exit 1
+        fi
+        
+        echo "✅ All build requirements verified"
+      shell: bash
+
+    - name: Build executable (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      working-directory: ${{ github.workspace }}
+      run: ${{ matrix.build_cmd }}
+
+    - name: Build executable (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      working-directory: ${{ github.workspace }}
+      run: ${{ matrix.template_build_cmd }}
+
+    - name: Test executable (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      working-directory: ${{ github.workspace }}
+      run: ${{ matrix.test_cmd }}
+
+    - name: Test executable (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      working-directory: ${{ github.workspace }}
+      run: ${{ matrix.template_test_cmd }}
+
+    - name: Upload build artifacts (instantiated mode)
+      if: steps.template_check.outputs.is_template == 'false'
+      uses: actions/upload-artifact@v4
+      with:
+        name: aio_terminal_template-${{ matrix.os }}
+        path: dist/
+        retention-days: 30
+
+    - name: Upload build artifacts (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: template-app-${{ matrix.os }}
+        path: dist/
+        retention-days: 30

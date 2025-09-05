@@ -1,0 +1,142 @@
+name: Template Setup
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  setup:
+    # Only run on first push when repository is created from template
+    if: github.run_number == 1 && github.event.repository.is_template == false
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+
+    - name: Extract repository information
+      id: repo_info
+      run: |
+        echo "repo_name=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
+        echo "owner_name=${GITHUB_REPOSITORY%/*}" >> $GITHUB_OUTPUT
+        echo "repo_description=$(gh repo view --json description -q .description || echo 'A terminal-first application with global shortcuts and rich logging')" >> $GITHUB_OUTPUT
+        echo "author_name=${GITHUB_REPOSITORY%/*}" >> $GITHUB_OUTPUT
+        echo "author_email=${GITHUB_REPOSITORY%/*}@users.noreply.github.com" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Replace project name
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: "aio_terminal_template"
+        replace: "${{ steps.repo_info.outputs.repo_name }}"
+        include: "**/*.{toml,yml,yaml,md,txt,py,json}"
+
+    - name: Replace repository owner
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: "tpinto"
+        replace: "${{ steps.repo_info.outputs.owner_name }}"
+        include: "**/*.{toml,yml,yaml,md,txt,py,json}"
+
+    - name: Replace author name
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: "Template Author"
+        replace: "${{ steps.repo_info.outputs.author_name }}"
+        include: "**/*.{toml,yml,yaml,md,txt,py,json}"
+
+    - name: Replace author email
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: "template@example.com"
+        replace: "${{ steps.repo_info.outputs.author_email }}"
+        include: "**/*.{toml,yml,yaml,md,txt,py,json}"
+
+    - name: Replace project description
+      uses: jacobtomlinson/gha-find-replace@v3
+      with:
+        find: "A modern terminal app template with PyInstaller packaging"
+        replace: "${{ steps.repo_info.outputs.repo_description }}"
+        include: "**/*.{toml,yml,yaml,md,txt,py,json}"
+
+    - name: Commit placeholder replacements
+      run: |
+        # Configure git with token for authenticated push
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+        
+        git add -A
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🔄 Template setup: Replace template values with repository information
+
+        - Project name: aio_terminal_template → ${{ steps.repo_info.outputs.repo_name }}
+        - Owner: tpinto → ${{ steps.repo_info.outputs.owner_name }}
+        - Author: Template Author → ${{ steps.repo_info.outputs.author_name }}
+        - Email: template@example.com → ${{ steps.repo_info.outputs.author_email }}
+        - Description: Updated to repository description
+
+        This commit was automatically generated when this repository was created from the template."
+          git push
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT || secrets.GITHUB_TOKEN }}
+
+    - name: Create setup validation issue
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: "✅ Template Setup Complete",
+            body: `## Template Setup Completed Successfully! 🎉
+
+          This repository has been automatically configured from the Terminal App Template.
+
+          ### What was updated:
+          - ✅ Project name: \`aio_terminal_template\` → **${{ steps.repo_info.outputs.repo_name }}**
+          - ✅ Repository owner: \`tpinto\` → **${{ steps.repo_info.outputs.owner_name }}**
+          - ✅ Author: \`Template Author\` → **${{ steps.repo_info.outputs.author_name }}**
+          - ✅ Email: \`template@example.com\` → **${{ steps.repo_info.outputs.author_email }}**
+          - ✅ Description: Updated to repository description
+
+          ### Next Steps:
+          1. **Review the changes** - Check that all placeholders were replaced correctly
+          2. **Update dependencies** - Run \`pip install -e .\` to install dependencies
+          3. **Customize configuration** - Edit \`config.toml\` for your specific needs
+          4. **Test the setup** - Run \`python -m app.cli --help\` to verify everything works
+          5. **Delete this issue** when you're done reviewing
+
+          ### Quick Start:
+          \`\`\`bash
+          # Install dependencies
+          pip install -e .
+
+          # Test the application
+          python -m app.cli --help
+
+          # Build executable
+          pyinstaller --onefile --name ${{ steps.repo_info.outputs.repo_name }} app/cli.py
+          # Or run the installed script
+          ${{ steps.repo_info.outputs.repo_name }} --help
+          \`\`\`
+
+          If you encounter any issues, please check the [Template Setup Guide](./TEMPLATE_SETUP.md) for detailed instructions.
+
+          ---
+          *This issue was automatically created by the template setup workflow.*`,
+            labels: ['template-setup', 'documentation']
+          })
