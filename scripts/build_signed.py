@@ -85,7 +85,7 @@ def build_app(sign=True):
 
     # Ensure we're in the correct directory and spec file exists
     current_dir = os.getcwd()
-    spec_file = os.path.join(current_dir, "aio_terminal_template.spec")
+    spec_file = os.path.join(current_dir, "meetscribe.spec")
 
     if not os.path.exists(spec_file):
         print(f"❌ ERROR: Spec file not found at: {spec_file}")
@@ -107,7 +107,7 @@ def build_app(sign=True):
 
     # Additional signing steps for macOS
     if sign and sys.platform == "darwin" and identity:
-        app_path = "dist/aio_terminal_template"
+        app_path = "dist/meetscribe"
 
         print("🔐 Performing additional code signing...")
 
@@ -131,18 +131,18 @@ def build_app(sign=True):
         print("1. Test the signed application")
         print("2. For distribution outside the App Store, " "consider notarization:")
         print(
-            "   xcrun notarytool submit dist/aio_terminal_template.zip "
+            "   xcrun notarytool submit dist/meetscribe.zip "
             "--keychain-profile 'AC_PASSWORD'"
         )
         print("3. For internal use, the signed app should work without " "warnings")
 
-    print("\n🎉 Build complete! Executable: dist/aio_terminal_template")
+    print("\n🎉 Build complete! Executable: dist/meetscribe")
     return True
 
 
 def main():
     """Main build function."""
-    print("🚀 Building AIO Terminal Template for macOS")
+    print("🚀 Building Meetscribe for macOS")
 
     # Change to project root directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -152,8 +152,8 @@ def main():
     print(f"📂 Current working directory: {os.getcwd()}")
 
     # Verify we're in the correct directory
-    if not os.path.exists("aio_terminal_template.spec"):
-        print("❌ ERROR: aio_terminal_template.spec not found in current directory!")
+    if not os.path.exists("meetscribe.spec"):
+        print("❌ ERROR: meetscribe.spec not found in current directory!")
         print("This script must be run from the project root or scripts/ subdirectory.")
         print(f"Current directory: {os.getcwd()}")
         print("Available files in current directory:")
@@ -167,15 +167,15 @@ def main():
         except Exception as e:
             print(f"Could not list directory: {e}")
 
-        # Try to find aio_terminal_template.spec in common locations
-        print("\nSearching for aio_terminal_template.spec in project...")
+        # Try to find meetscribe.spec in common locations
+        print("\nSearching for meetscribe.spec in project...")
         for root, dirs, files in os.walk("."):
-            if "aio_terminal_template.spec" in files:
-                spec_path = os.path.join(root, "aio_terminal_template.spec")
-                print(f"Found aio_terminal_template.spec at: {spec_path}")
+            if "meetscribe.spec" in files:
+                spec_path = os.path.join(root, "meetscribe.spec")
+                print(f"Found meetscribe.spec at: {spec_path}")
                 break
         else:
-            print("aio_terminal_template.spec not found anywhere in project!")
+            print("meetscribe.spec not found anywhere in project!")
 
         sys.exit(1)
 

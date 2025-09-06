@@ -1,89 +1,10 @@
-# Default configuration for the AIO Terminal Template.
-# Users can override these settings by creating a local `config.local.toml` file.
+# Configuration for Meetscribe
 
-[viewer]
-# Log level for the Action Stream. Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-log_level = "INFO"
-# Color theme for the Rich-based viewer.
-color_theme = "default"
-# Whether the viewer should automatically scroll to the latest entry.
-autoscroll = true
-# Maximum number of lines to display in the viewer.
-max_lines = 1000
+[deepgram]
+# Your Deepgram API key. This is a required setting.
+# You can get an API key from https://console.deepgram.com/
+api_key = ""
 
 [paths]
-# Default folder for storing screenshots.
-screenshots_folder = "~/screenshots"
-# Default folder for log files.
-logs_folder = "~/.cache/aio_terminal_template/logs"
-# Log file retention policy in days.
-log_retention_days = 7
-
-[shortcuts]
-# Enable or disable global keyboard shortcuts on startup.
-enabled = true
-
-  [shortcuts.screenshot_full]
-  # Full-screen screenshot, save to a dated folder, copy path to clipboard.
-  keys = "<ctrl>+<shift>+s"
-  action = "screenshot.full"
-  enabled = true
-
-  [shortcuts.clean_clipboard]
-  # Clean clipboard text and copy back.
-  keys = "<ctrl>+<shift>+x"
-  action = "clipboard.clean"
-  enabled = true
-
-  [shortcuts.ping_api]
-  # Send a GET request to a configured URL.
-  keys = "<ctrl>+<shift>+r"
-  action = "network.ping"
-  enabled = true
-
-  [shortcuts.check_update]
-  # Check GitHub for the latest release.
-  keys = "<ctrl>+<shift>+u"
-  action = "app.update_check"
-  enabled = true
-
-  [shortcuts.update_now]
-  # Automatically download and install the latest version.
-  keys = "<ctrl>+<shift>+d"
-  action = "app.update_now"
-  enabled = true
-
-  [shortcuts.test_connectivity]
-  # Test basic internet connectivity.
-  keys = "<ctrl>+<shift>+i"
-  action = "network.test_connectivity"
-  enabled = true
-
-  [shortcuts.app_version]
-  # Show application version information.
-  keys = "<ctrl>+<shift>+v"
-  action = "app.version"
-  enabled = true
-
-[network]
-# Base URL for API requests made by actions.
-api_base_url = "https://api.example.com"
-# Default timeout for network requests in seconds.
-timeout = 10
-# Optional headers to include in every request.
-# Example: "Authorization" = "Bearer YOUR_TOKEN"
-[network.headers]
-
-[updates]
-# GitHub repository owner/name to check for new releases.
-github_repo = "tpinto/aio_terminal_template"
-# Optional: Override the executable name pattern for updates (defaults to auto-detection)
-# executable_name = "aio_terminal_template"
-
-[daemon]
-# Enable daemon mode on Unix-like systems.
-enabled = false
-# Path for the daemon's log file.
-log_file = "/tmp/aio_terminal_template-daemon.log"
-# Path for the daemon's process ID (PID) file.
-pid_file = "/tmp/aio_terminal_template-daemon.pid"
+# Default folder for storing meeting notes.
+output_folder = "~/Documents/Meetscribe"

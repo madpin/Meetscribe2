@@ -14,17 +14,17 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
-            asset_name: aio_terminal_template-linux
-            build_cmd: pyinstaller aio_terminal_template.spec
-            artifact_path: dist/aio_terminal_template
+            asset_name: meetscribe-linux
+            build_cmd: pyinstaller meetscribe.spec
+            artifact_path: dist/meetscribe
           - os: macos-latest
-            asset_name: aio_terminal_template-macos
+            asset_name: meetscribe-macos
             build_cmd: python scripts/build_signed.py
-            artifact_path: dist/aio_terminal_template
+            artifact_path: dist/meetscribe
           - os: windows-latest
-            asset_name: aio_terminal_template-windows.exe
-            build_cmd: pyinstaller aio_terminal_template.spec
-            artifact_path: dist/aio_terminal_template.exe
+            asset_name: meetscribe-windows.exe
+            build_cmd: pyinstaller meetscribe.spec
+            artifact_path: dist/meetscribe.exe
 
     steps:
     - uses: actions/checkout@v4
@@ -84,8 +84,8 @@ jobs:
         echo "Current working directory: $(pwd)"
         echo "Files in current directory:"
         ls -la
-        echo "Looking for aio_terminal_template.spec:"
-        find . -name "aio_terminal_template.spec" -type f || echo "aio_terminal_template.spec not found"
+        echo "Looking for meetscribe.spec:"
+        find . -name "meetscribe.spec" -type f || echo "meetscribe.spec not found"
       shell: bash
 
     - name: Build release executable
@@ -158,14 +158,14 @@ jobs:
           ## What's New in ${{ steps.release_notes.outputs.version }}
 
           ### Downloads
-          - **Linux:** `aio_terminal_template-linux.tar.gz`
-          - **macOS:** `aio_terminal_template-macos.tar.gz`
-          - **Windows:** `aio_terminal_template-windows.zip`
+          - **Linux:** `meetscribe-linux.tar.gz`
+          - **macOS:** `meetscribe-macos.tar.gz`
+          - **Windows:** `meetscribe-windows.zip`
 
           ### Installation
           1. Download the appropriate file for your operating system
           2. Extract the archive
-          3. Run the `aio_terminal_template` executable (or `aio_terminal_template.exe` on Windows)
+          3. Run the `meetscribe` executable (or `meetscribe.exe` on Windows)
 
           ### Features
           - Standalone executable with no Python dependencies required

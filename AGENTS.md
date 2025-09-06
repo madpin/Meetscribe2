@@ -1,6 +1,6 @@
-# AI Agent Instructions
+# AI Agent Instructions for Meetscribe
 
-This file contains instructions for AI coding agents working on this terminal app template project.
+This file contains instructions for AI coding agents working on the Meetscribe project.
 
 ## Development Commands
 
@@ -10,7 +10,7 @@ This file contains instructions for AI coding agents working on this terminal ap
 source .venv/bin/activate
 
 # Install dependencies
-pip install typer rich pynput pyautogui pyperclip requests Pillow python-daemon toml flake8 pytest pyinstaller
+pip install typer rich toml deepgram-sdk flake8 pytest pyinstaller
 ```
 
 **Testing:**
@@ -23,25 +23,24 @@ python -m pytest tests/test_config.py -v
 
 # Test CLI manually
 python -m app.cli --help
-python -m app.cli action screenshot.full
+python -m app.cli process dir /path/to/audio/files
 ```
 
 **Building Executables:**
 ```bash
 # PyInstaller - creates a single executable file
-pyinstaller --onefile --name aio_terminal_template --add-data "config.toml:." app/cli.py
+pyinstaller --onefile --name meetscribe --add-data "config.toml:." app/cli.py
 
 # Test the built executable
-./dist/aio_terminal_template --help
+./dist/meetscribe --help
 ```
 
 ## Project Structure
 
 - **Entry point:** `app/cli.py` (Typer-based CLI)
-- **Actions:** `app/actions/` (auto-discovered modules)
-- **Shortcuts:** `app/shortcuts/manager.py` (pynput global hotkeys)  
-- **Config:** `app/core/config.py` (TOML with local overrides)
-- **Tests:** `tests/` (pytest with 34 tests covering all modules)
+- **Transcriber:** `app/transcriber.py` (Deepgram integration)
+- **Core:** `app/core/` (config, logging, context)
+- **Tests:** `tests/` (pytest with comprehensive test coverage)
 
 ## Code Conventions
 
@@ -50,7 +49,7 @@ pyinstaller --onefile --name aio_terminal_template --add-data "config.toml:." ap
 - **Config format:** TOML with deep merging
 - **Test framework:** pytest with unittest.mock
 - **Import style:** `from app.module import function`
-- **Action signature:** `def action_name(config): return "result"`
+- **Module structure:** Clean separation of concerns with dependency injection
 
 ## Build System
 
@@ -62,18 +61,18 @@ pyinstaller --onefile --name aio_terminal_template --add-data "config.toml:." ap
 
 ## Testing Strategy
 
-- **Unit tests** for all core modules (config, registry, shortcuts)
+- **Unit tests** for all core modules (config, logging, context)
 - **CLI tests** using Typer's testing framework
-- **Mock-based testing** for system dependencies (filesystem, shortcuts)
-- **Integration tests** for action execution
+- **Mock-based testing** for external services (Deepgram API)
+- **Integration tests** for audio processing workflows
 - **Build verification** tests for executables
 
 ## Common Tasks
 
-**Adding new action:**
-1. Create `app/actions/my_action.py`
-2. Define `def my_function(config): ...`
-3. Test with `python -m app.cli action my_function`
+**Adding new features:**
+1. Create new modules in `app/` directory
+2. Add CLI commands in `app/cli.py`
+3. Test with `python -m app.cli --help`
 
 **Debugging build issues:**
 1. Check virtual environment is activated
