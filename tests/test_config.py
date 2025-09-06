@@ -27,11 +27,11 @@ def test_load_config_default_only():
         # Create a default config
         config_path = Path(tmpdir) / "config.toml"
         config_path.write_text("""
-[viewer]
-log_level = "info"
+[deepgram]
+api_key = "test_key"
 
 [paths]
-screenshots_folder = "~/screenshots"
+output_folder = "~/Documents/Meetscribe"
         """)
 
         # Change to temp directory temporarily
@@ -40,8 +40,8 @@ screenshots_folder = "~/screenshots"
             os.chdir(tmpdir)
             config = load_config()
 
-            assert config["viewer"]["log_level"] == "info"
-            assert config["paths"]["screenshots_folder"] == "~/screenshots"
+            assert config["deepgram"]["api_key"] == "test_key"
+            assert config["paths"]["output_folder"] == "~/Documents/Meetscribe"
         finally:
             os.chdir(original_cwd)
 
@@ -52,22 +52,18 @@ def test_load_config_with_local_override():
         # Create default config
         config_path = Path(tmpdir) / "config.toml"
         config_path.write_text("""
-[viewer]
-log_level = "info"
-theme = "dark"
+[deepgram]
+api_key = "default_key"
 
 [paths]
-screenshots_folder = "~/screenshots"
+output_folder = "~/Documents/Meetscribe"
         """)
 
         # Create local override
         local_config_path = Path(tmpdir) / "config.local.toml"
         local_config_path.write_text("""
-[viewer]
-log_level = "debug"
-
-[paths]
-logs_folder = "~/custom_logs"
+[deepgram]
+api_key = "local_key"
         """)
 
         original_cwd = os.getcwd()
@@ -76,12 +72,9 @@ logs_folder = "~/custom_logs"
             config = load_config()
 
             # Should have overridden values
-            assert config["viewer"]["log_level"] == "debug"
+            assert config["deepgram"]["api_key"] == "local_key"
             # Should preserve non-overridden values
-            assert config["viewer"]["theme"] == "dark"
-            assert config["paths"]["screenshots_folder"] == "~/screenshots"
-            # Should have new values from local
-            assert config["paths"]["logs_folder"] == "~/custom_logs"
+            assert config["paths"]["output_folder"] == "~/Documents/Meetscribe"
         finally:
             os.chdir(original_cwd)
 
