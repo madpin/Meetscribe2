@@ -240,7 +240,40 @@ def process_directory(
         ctx.config.get("processing", {}).get("reprocess", False)
     )
 
-    if select_file:
+    # Determine if we should use select mode (either explicitly requested or due to limits)
+    use_select_mode = select_file
+
+    if not select_file:
+        # Read limits from config
+        soft_limit = int(ctx.config.get("processing", {}).get("soft_limit_files", 10))
+        hard_limit = int(ctx.config.get("processing", {}).get("hard_limit_files", 25))
+
+        # Build candidate files (respecting reprocess setting)
+        candidate_files = []
+        for audio_file in audio_files:
+            output_file = output_folder / f"{audio_file.stem}.txt"
+            if not effective_reprocess and output_file.exists():
+                # Skip existing outputs when not reprocessing
+                continue
+            candidate_files.append(audio_file)
+
+        # Check hard limit - auto enter select mode
+        if len(candidate_files) > hard_limit:
+            ctx.logger.warning(f"Found {len(candidate_files)} files (exceeds hard limit of {hard_limit})")
+            ctx.logger.warning("Automatically entering interactive selection mode...")
+            use_select_mode = True
+
+        # Check soft limit and offer select mode option
+        elif len(candidate_files) > soft_limit:
+            ctx.logger.warning(f"Found {len(candidate_files)} files (exceeds soft limit of {soft_limit})")
+            if typer.confirm(f"Process all {len(candidate_files)} files or enter selection mode?", default=False):
+                ctx.logger.info("Proceeding with batch processing...")
+                use_select_mode = False
+            else:
+                ctx.logger.info("Entering interactive selection mode...")
+                use_select_mode = True
+
+    if use_select_mode:
         # Interactive selection mode - default to reprocess=True unless explicitly set to False
         effective_reprocess_select = True if reprocess is None else reprocess
 
@@ -272,31 +305,20 @@ def process_directory(
         total_selected = len(chosen_files)
         ctx.logger.info(f"Selection summary: Processed={processed_count}, Skipped={skipped_count}, Total selected={total_selected}")
     else:
-        # Batch processing mode with limits
-        # Read limits from config
-        soft_limit = int(ctx.config.get("processing", {}).get("soft_limit_files", 10))
-        hard_limit = int(ctx.config.get("processing", {}).get("hard_limit_files", 25))
+        # Batch processing mode
+        # Read limits from config (if not already read above)
+        if 'candidate_files' not in locals():
+            soft_limit = int(ctx.config.get("processing", {}).get("soft_limit_files", 10))
+            hard_limit = int(ctx.config.get("processing", {}).get("hard_limit_files", 25))
 
-        # Build candidate files (respecting reprocess setting)
-        candidate_files = []
-        for audio_file in audio_files:
-            output_file = output_folder / f"{audio_file.stem}.txt"
-            if not effective_reprocess and output_file.exists():
-                # Skip existing outputs when not reprocessing
-                continue
-            candidate_files.append(audio_file)
-
-        # Check hard limit
-        if len(candidate_files) > hard_limit:
-            ctx.logger.error(f"Too many files to process: {len(candidate_files)} > {hard_limit} (hard limit)")
-            ctx.logger.error("Use --select for interactive selection or increase hard_limit_files in config")
-            raise typer.Exit(code=1)
-
-        # Check soft limit and prompt
-        if len(candidate_files) > soft_limit:
-            if not typer.confirm(f"Process {len(candidate_files)} files? (soft limit: {soft_limit}, hard limit: {hard_limit})", default=False):
-                ctx.logger.info("Processing cancelled by user")
-                return
+            # Build candidate files (respecting reprocess setting)
+            candidate_files = []
+            for audio_file in audio_files:
+                output_file = output_folder / f"{audio_file.stem}.txt"
+                if not effective_reprocess and output_file.exists():
+                    # Skip existing outputs when not reprocessing
+                    continue
+                candidate_files.append(audio_file)
 
         # Initialize counters
         processed_count = 0
