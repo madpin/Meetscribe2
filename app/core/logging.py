@@ -51,9 +51,9 @@ def setup_logging(
     )
     rich_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
 
-    # Create formatter for console output
+    # Create formatter for console output - simplified to avoid duplication with RichHandler
     formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "%(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     rich_handler.setFormatter(formatter)

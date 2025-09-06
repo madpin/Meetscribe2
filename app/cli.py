@@ -47,6 +47,11 @@ def process_directory(
     audio_directory: str = typer.Argument(
         ..., help="The directory containing audio files to process."
     ),
+    reprocess: Optional[bool] = typer.Option(
+        None,
+        "--reprocess",
+        help="Reprocess files even if the output .txt already exists (overwrite).",
+    ),
 ):
     """
     Process all audio files in a directory and generate meeting notes.
@@ -60,7 +65,6 @@ def process_directory(
 
     if not audio_path.is_dir():
         ctx.logger.error(f"The provided path is not a directory: {audio_directory}")
-        print(f"Error: The provided path is not a directory: {audio_directory}")
         raise typer.Exit(code=1)
 
     supported_formats = [".wav", ".mp3", ".m4a", ".aac"]
@@ -70,7 +74,6 @@ def process_directory(
 
     if not audio_files:
         ctx.logger.warning(f"No supported audio files found in {audio_directory}")
-        print(f"No supported audio files found in {audio_directory}")
         return
 
     output_folder_str = ctx.config.get("paths", {}).get(
@@ -79,15 +82,33 @@ def process_directory(
     output_folder = Path(output_folder_str).expanduser()
     output_folder.mkdir(parents=True, exist_ok=True)
 
+    # Determine effective reprocess behavior
+    effective_reprocess = reprocess if reprocess is not None else bool(
+        ctx.config.get("processing", {}).get("reprocess", False)
+    )
+
+    # Initialize counters
+    processed_count = 0
+    skipped_count = 0
+
     for audio_file in audio_files:
-        ctx.logger.info(f"Processing {audio_file.name}...")
-        print(f"Processing {audio_file.name}...")
-        notes = transcriber.process_audio_file(audio_file)
         output_file = output_folder / f"{audio_file.stem}.txt"
+        if not effective_reprocess and output_file.exists():
+            ctx.logger.info(f"Skipping {audio_file.name}: {output_file} already exists")
+            skipped_count += 1
+            continue
+
+        ctx.logger.info(f"Processing {audio_file.name}...")
+        notes = transcriber.process_audio_file(audio_file)
         with open(output_file, "w") as f:
             f.write(notes)
         ctx.logger.info(f"Notes saved to {output_file}")
-        print(f"Notes saved to {output_file}")
+        processed_count += 1
+
+    # Print summary
+    total_count = len(audio_files)
+    msg = f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total={total_count}"
+    ctx.logger.info(msg)
 
 
 if __name__ == "__main__":

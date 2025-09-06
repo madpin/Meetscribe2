@@ -55,8 +55,11 @@ The executable will be created in the `dist/` directory and can be distributed t
 ### ⌨️ Available Commands
 
 ```bash
-# Process audio files from a directory
+# Process audio files from a directory (skips existing outputs by default)
 python -m app.cli process dir /path/to/audio/files
+
+# Force reprocessing of all files, even if outputs exist
+python -m app.cli process dir /path/to/audio/files --reprocess
 
 # View available commands
 python -m app.cli --help
