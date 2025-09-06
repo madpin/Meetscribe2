@@ -10,9 +10,11 @@ Meetscribe is a tool that automatically converts audio recordings of meetings in
 
 - **🤖 Automated Transcription and Summarization:** Turn raw audio into polished notes without lifting a finger. The tool intelligently processes recordings to create a full transcript, a high-level **summary**, a list of **key decisions**, clear **action items**, and a **speaker timeline** with diarization.
 - **📁 Effortless Batch Processing:** Simply point the tool to a folder of your meeting recordings. It automatically finds and processes all supported audio files in one go, saving you the tedious task of handling them one by one.
-- **🎯 Interactive Single-File Selection:** Use arrow keys and space bar to interactively choose which file to process from a directory, with live preview of file metadata including size, duration, done status, and relative timestamps.
+- **🎯 Interactive Single-File Selection:** Use arrow keys and space bar to interactively choose which file to process from a directory, with live preview of file metadata including size, duration, done status, and relative timestamps. Supports pagination with left/right arrows and configurable page sizes.
 - **🖥️ Simple Command-Line Operation:** Designed for efficiency, Meetscribe operates through a clean and simple command-line interface. It provides a fast, scriptable way to manage your meeting notes directly from the terminal.
 - **🔄 Smart Skip Reprocessing:** By default, skips processing audio files when output already exists to save time and API costs. Use `--reprocess` flag to force overwriting existing outputs. In `--select` mode, files are reprocessed by default unless explicitly disabled.
+- **📋 Newest-First Ordering:** All file lists are automatically sorted by last modified time (newest first) for better UX.
+- **🛡️ Safe Batch Processing:** Configurable soft and hard limits prevent accidental large batch runs with user confirmation prompts.
 - **📦 Standalone Application:** Packaged as a single, standalone binary file, so you can distribute it as a self-contained application that runs on its own without requiring users to install Python or any other dependencies.
 
 ## 🏗️ Architecture Overview

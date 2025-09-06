@@ -55,42 +55,75 @@ def interactive_select_file(files: list, output_folder: Path) -> Optional[list]:
     """
     from app.core.utils import format_file_size, get_audio_duration, format_duration, format_time_ago
     from datetime import datetime
+    from math import ceil
 
+    ctx = get_app_context()
     if not files:
         return None
 
     console = Console()
-    current_index = 0
-    selected_indices = set()
 
-    # Build file info
-    file_infos = []
-    for file_path in files:
-        stat = file_path.stat()
-        modified_dt = datetime.fromtimestamp(stat.st_mtime)
-        modified_str = f"{modified_dt.strftime('%Y-%m-%d %H:%M')} ({format_time_ago(modified_dt)})"
-        size_str = format_file_size(stat.st_size)
-        duration = get_audio_duration(file_path)
-        duration_str = format_duration(duration)
+    # Read page size from config
+    page_size = ctx.config.get("ui", {}).get("selection_page_size", 10)
 
-        # Check if file has been processed
-        output_file = output_folder / f"{file_path.stem}.txt"
-        processed = output_file.exists()
+    # Pagination state
+    current_page = 0
+    total_pages = ceil(len(files) / page_size)
+    current_index = 0  # Index within current page
 
-        file_infos.append({
-            'path': file_path,
-            'name': file_path.name,
-            'modified_str': modified_str,
-            'size_str': size_str,
-            'duration_str': duration_str,
-            'processed': processed
-        })
+    # Track selected files by path (persists across pages)
+    selected_paths = set()
+
+    # Cache for metadata to avoid recomputing
+    metadata_cache = {}
+
+    # Sort files by last modified (newest first)
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    def get_file_info(file_path: Path):
+        """Get cached file info, computing duration lazily."""
+        if file_path not in metadata_cache:
+            stat = file_path.stat()
+            modified_dt = datetime.fromtimestamp(stat.st_mtime)
+            modified_str = f"{modified_dt.strftime('%Y-%m-%d %H:%M')} ({format_time_ago(modified_dt)})"
+            size_str = format_file_size(stat.st_size)
+
+            # Compute duration lazily (expensive operation)
+            duration = get_audio_duration(file_path)
+            duration_str = format_duration(duration)
+
+            # Check if file has been processed
+            output_file = output_folder / f"{file_path.stem}.txt"
+            processed = output_file.exists()
+
+            metadata_cache[file_path] = {
+                'path': file_path,
+                'name': file_path.name,
+                'modified_str': modified_str,
+                'size_str': size_str,
+                'duration_str': duration_str,
+                'processed': processed
+            }
+
+        return metadata_cache[file_path]
+
+    def get_current_page_files():
+        """Get files for current page."""
+        start_idx = current_page * page_size
+        end_idx = min(start_idx + page_size, len(files))
+        return files[start_idx:end_idx]
 
     with Live(console=console, refresh_per_second=10, auto_refresh=False) as live:
         while True:
+            # Get current page files and build info
+            current_page_files = get_current_page_files()
+            file_infos = [get_file_info(f) for f in current_page_files]
+
             # Create table
-            selected_count = len(selected_indices)
-            title = f"Select files with arrow keys, Space to toggle selection ({selected_count} selected), Enter to confirm, Esc/q to cancel"
+            selected_count = len(selected_paths)
+            start_idx = current_page * page_size
+            end_idx = min(start_idx + page_size, len(files))
+            title = f"Page {current_page + 1}/{total_pages} — Showing {start_idx + 1}-{end_idx} of {len(files)} — Select with ↑↓/Space, ←→ pages, Enter confirm, Esc/q cancel ({selected_count} selected)"
             table = Table(title=title, title_style="bold blue")
             table.add_column("Sel", style="red", justify="center", width=3)
             table.add_column("Done", style="bright_green", justify="center", width=5)
@@ -99,9 +132,9 @@ def interactive_select_file(files: list, output_folder: Path) -> Optional[list]:
             table.add_column("Size", style="magenta", justify="right")
             table.add_column("Duration", style="blue", justify="center")
 
-            # Add rows
+            # Add rows for current page
             for i, info in enumerate(file_infos):
-                sel_marker = "*" if i in selected_indices else ""
+                sel_marker = "*" if info['path'] in selected_paths else ""
                 processed_marker = "✓" if info['processed'] else "-"
                 style = "black on cyan" if i == current_index else None
                 table.add_row(sel_marker, processed_marker, info['name'], info['modified_str'], info['size_str'], info['duration_str'], style=style)
@@ -119,21 +152,30 @@ def interactive_select_file(files: list, output_folder: Path) -> Optional[list]:
 
             # Handle keys
             if k == rkey.UP:
-                current_index = (current_index - 1) % len(files)
+                current_index = (current_index - 1) % len(current_page_files)
             elif k == rkey.DOWN:
-                current_index = (current_index + 1) % len(files)
+                current_index = (current_index + 1) % len(current_page_files)
+            elif k == rkey.LEFT:
+                # Previous page
+                current_page = (current_page - 1) % total_pages
+                current_index = 0
+            elif k == rkey.RIGHT:
+                # Next page
+                current_page = (current_page + 1) % total_pages
+                current_index = 0
             elif k == rkey.SPACE:
                 # Toggle selection for current file
-                if current_index in selected_indices:
-                    selected_indices.remove(current_index)
+                current_file = current_page_files[current_index]
+                if current_file in selected_paths:
+                    selected_paths.remove(current_file)
                 else:
-                    selected_indices.add(current_index)
+                    selected_paths.add(current_file)
             elif k in (rkey.ENTER, rkey.CR):
                 # Return selected files, or current file if none selected
-                if selected_indices:
-                    return [files[i] for i in sorted(selected_indices)]
+                if selected_paths:
+                    return list(selected_paths)
                 else:
-                    return [files[current_index]]
+                    return [current_page_files[current_index]]
             elif k in (rkey.ESC, 'q', 'Q'):
                 return None
 
@@ -181,6 +223,7 @@ def process_directory(
         p for p in audio_path.iterdir()
         if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
     ]
+    audio_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     if not audio_files:
         ctx.logger.warning(f"No supported audio files found in {audio_path}")
@@ -229,12 +272,37 @@ def process_directory(
         total_selected = len(chosen_files)
         ctx.logger.info(f"Selection summary: Processed={processed_count}, Skipped={skipped_count}, Total selected={total_selected}")
     else:
-        # Batch processing mode (existing logic)
+        # Batch processing mode with limits
+        # Read limits from config
+        soft_limit = int(ctx.config.get("processing", {}).get("soft_limit_files", 10))
+        hard_limit = int(ctx.config.get("processing", {}).get("hard_limit_files", 25))
+
+        # Build candidate files (respecting reprocess setting)
+        candidate_files = []
+        for audio_file in audio_files:
+            output_file = output_folder / f"{audio_file.stem}.txt"
+            if not effective_reprocess and output_file.exists():
+                # Skip existing outputs when not reprocessing
+                continue
+            candidate_files.append(audio_file)
+
+        # Check hard limit
+        if len(candidate_files) > hard_limit:
+            ctx.logger.error(f"Too many files to process: {len(candidate_files)} > {hard_limit} (hard limit)")
+            ctx.logger.error("Use --select for interactive selection or increase hard_limit_files in config")
+            raise typer.Exit(code=1)
+
+        # Check soft limit and prompt
+        if len(candidate_files) > soft_limit:
+            if not typer.confirm(f"Process {len(candidate_files)} files? (soft limit: {soft_limit}, hard limit: {hard_limit})", default=False):
+                ctx.logger.info("Processing cancelled by user")
+                return
+
         # Initialize counters
         processed_count = 0
         skipped_count = 0
 
-        for audio_file in audio_files:
+        for audio_file in candidate_files:
             output_file = output_folder / f"{audio_file.stem}.txt"
             if not effective_reprocess and output_file.exists():
                 ctx.logger.info(f"Skipping {audio_file.name}: {output_file} already exists")
@@ -249,8 +317,8 @@ def process_directory(
             processed_count += 1
 
         # Print summary
-        total_count = len(audio_files)
-        msg = f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total={total_count}"
+        total_candidates = len(candidate_files)
+        msg = f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total candidates={total_candidates}"
         ctx.logger.info(msg)
 
 
@@ -288,6 +356,7 @@ def process_list(
         p for p in audio_path.iterdir()
         if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
     ]
+    audio_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     if not audio_files:
         ctx.logger.warning(f"No supported audio files found in {audio_path}")
