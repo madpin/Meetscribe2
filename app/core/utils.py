@@ -57,27 +57,14 @@ def safe_path_join(base: Path, *parts: str) -> Path:
         Safe joined path
 
     Raises:
-        ValueError: If any path component contains unsafe characters
+        ValueError: If path traversal is detected
     """
-    # Resolve the base path to handle any .. or . components
     resolved_base = base.resolve()
-
-    # Check each part for unsafe characters
-    unsafe_chars = ["..", "/", "\\"]
-    for part in parts:
-        if any(char in part for char in unsafe_chars):
-            raise ValueError(f"Unsafe path component: {part}")
-
-    # Join and resolve to ensure the result is within the base directory
-    result = resolved_base / Path(*parts)
-    result = result.resolve()
-
-    # Ensure the result is still within the base directory
+    result = (resolved_base / Path(*parts)).resolve()
     try:
         result.relative_to(resolved_base)
     except ValueError:
         raise ValueError(f"Path traversal detected: {result}")
-
     return result
 
 

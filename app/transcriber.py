@@ -7,7 +7,8 @@ from pathlib import Path
 
 from deepgram import DeepgramClient, PrerecordedOptions
 
-from app.core.context import AppContext
+from app.core.config_models import DeepgramConfig
+from app.core.exceptions import TranscriptionError
 
 
 # Supported audio file extensions
@@ -27,31 +28,18 @@ class Transcriber:
     A class to handle transcription and analysis of audio files.
     """
 
-    def __init__(self, ctx: AppContext):
+    def __init__(self, cfg: DeepgramConfig, logger):
         """
-        Initialize the Transcriber with the application context.
+        Initialize the Transcriber with configuration and logger.
 
         Args:
-            ctx: The application context.
+            cfg: The Deepgram configuration.
+            logger: The logger instance.
         """
-        self.ctx = ctx
-        self.deepgram_api_key = self._get_api_key()
-        self.client = DeepgramClient(self.deepgram_api_key)
+        self.cfg = cfg
+        self.logger = logger
+        self.client = DeepgramClient(self.cfg.api_key)
 
-    def _get_api_key(self) -> str:
-        """
-        Get the Deepgram API key from the configuration.
-
-        Returns:
-            The Deepgram API key.
-
-        Raises:
-            ValueError: If the API key is not found in the configuration.
-        """
-        api_key = self.ctx.config.get("deepgram", {}).get("api_key")
-        if not api_key:
-            raise ValueError("Deepgram API key not found in config.toml")
-        return api_key
 
     def _get_mimetype(self, file_path: Path) -> str:
         """
@@ -75,42 +63,33 @@ class Transcriber:
 
         Returns:
             A string containing the structured notes.
+
+        Raises:
+            TranscriptionError: If transcription fails.
         """
-        self.ctx.logger.info(f"Processing audio file: {file_path}")
+        self.logger.info(f"Processing audio file: {file_path}")
 
         try:
             with open(file_path, "rb") as audio_file:
                 mimetype = self._get_mimetype(file_path)
                 source = {"buffer": audio_file.read(), "mimetype": mimetype}
 
-                # Read config-driven options
-                dg_cfg = self.ctx.config.get("deepgram", {})
-                model = dg_cfg.get("model", "nova-3")
-                language = dg_cfg.get("language", "en-US")
-                smart_format = dg_cfg.get("smart_format", True)
-                diarize = dg_cfg.get("diarize", True)
-                diarize_speakers = dg_cfg.get("diarize_speakers", 0) or 0
-                min_speaker_gap = dg_cfg.get("min_speaker_gap", 0.0) or 0.0
-                max_speaker_gap = dg_cfg.get("max_speaker_gap", 0.0) or 0.0
-                summarize = dg_cfg.get("summarize", "v2")
-                detect_topics = dg_cfg.get("detect_topics", True)
-                intents = dg_cfg.get("intents", True)
-
+                # Read config-driven options from typed config
                 options_kwargs = {
-                    "model": model,
-                    "language": language,
-                    "smart_format": smart_format,
-                    "diarize": diarize,
-                    "summarize": summarize,
-                    "detect_topics": detect_topics,
-                    "intents": intents,
+                    "model": self.cfg.model,
+                    "language": self.cfg.language,
+                    "smart_format": self.cfg.smart_format,
+                    "diarize": self.cfg.diarize,
+                    "summarize": self.cfg.summarize,
+                    "detect_topics": self.cfg.detect_topics,
+                    "intents": self.cfg.intents,
                 }
-                if diarize_speakers > 0:
-                    options_kwargs["diarize_speakers"] = int(diarize_speakers)
-                if min_speaker_gap > 0:
-                    options_kwargs["min_speaker_gap"] = float(min_speaker_gap)
-                if max_speaker_gap > 0:
-                    options_kwargs["max_speaker_gap"] = float(max_speaker_gap)
+                if self.cfg.diarize_speakers > 0:
+                    options_kwargs["diarize_speakers"] = int(self.cfg.diarize_speakers)
+                if self.cfg.min_speaker_gap > 0:
+                    options_kwargs["min_speaker_gap"] = float(self.cfg.min_speaker_gap)
+                if self.cfg.max_speaker_gap > 0:
+                    options_kwargs["max_speaker_gap"] = float(self.cfg.max_speaker_gap)
 
                 options = PrerecordedOptions(**options_kwargs)
 
@@ -121,8 +100,8 @@ class Transcriber:
                 return self._format_results(response)
 
         except Exception as e:
-            self.ctx.logger.error(f"Error processing {file_path}: {e}")
-            return f"Error: Could not process {file_path}."
+            self.logger.error(f"Error processing {file_path}: {e}")
+            raise TranscriptionError(f"Could not process {file_path}") from e
 
     def _format_results(self, response) -> str:
         """
@@ -185,7 +164,7 @@ class Transcriber:
             return formatted_output.strip()
 
         except Exception as e:
-            self.ctx.logger.error(f"Error formatting results: {e}")
+            self.logger.error(f"Error formatting results: {e}")
             return "Error: Could not format the results."
 
     def _format_list(self, items: list) -> str:
@@ -242,5 +221,5 @@ class Transcriber:
                          for spk, words in by_spk.items() if words]
                 return "\n".join(lines) if lines else "- None"
         except Exception as e:
-            self.ctx.logger.debug(f"Diarization formatting fallback: {e}")
+            self.logger.debug(f"Diarization formatting fallback: {e}")
         return "- None"

@@ -128,6 +128,7 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 2. `config.local.toml` is merged over base config if it exists
 3. Deep merge preserves nested structure
 4. Local config takes precedence over base config
+5. Configuration is validated at startup via Pydantic models for type safety and consistency
 
 ## Google Calendar Setup
 

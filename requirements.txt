@@ -1,6 +1,7 @@
 typer
 rich
 toml
+pydantic>=2.0.0
 deepgram-sdk
 mutagen
 readchar

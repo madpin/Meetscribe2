@@ -6,9 +6,7 @@ with attendees, descriptions, and attachment information.
 """
 
 import json
-import os
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from googleapiclient.discovery import build
@@ -16,8 +14,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-from app.core.context import AppContext
-from app.core.exceptions import ConfigurationError
+from app.core.config_models import GoogleConfig
+from app.core.exceptions import ConfigurationError, GoogleCalendarError
 from app.core.utils import ensure_directory_exists
 
 
@@ -28,28 +26,24 @@ class GoogleCalendarClient:
     Handles OAuth authentication, token caching, and event retrieval.
     """
 
-    def __init__(self, ctx: AppContext):
+    def __init__(self, cfg: GoogleConfig, logger):
         """
         Initialize the Google Calendar client.
 
         Args:
-            ctx: Application context with configuration and logging
+            cfg: Google configuration
+            logger: Logger instance
 
         Raises:
-            ConfigurationError: If Google configuration is missing or invalid
+            ConfigurationError: If Google credentials file is missing
+            GoogleCalendarError: If service initialization fails
         """
-        self.ctx = ctx
-        self.logger = ctx.logger
+        self.cfg = cfg
+        self.logger = logger
 
-        # Load Google configuration
-        google_config = ctx.config.get("google", {})
-        self.credentials_file = Path(google_config.get("credentials_file", "")).expanduser()
-        self.token_file = Path(google_config.get("token_file", "")).expanduser()
-        self.scopes = google_config.get("scopes", [])
-
-        if not self.credentials_file.exists():
+        if not self.cfg.credentials_file.exists():
             error_msg = (
-                f"Google credentials file not found: {self.credentials_file}\n"
+                f"Google credentials file not found: {self.cfg.credentials_file}\n"
                 "Please download credentials.json from Google Cloud Console and place it at the configured path.\n"
                 "See USER_GUIDE.md for setup instructions."
             )
@@ -57,7 +51,7 @@ class GoogleCalendarClient:
             raise ConfigurationError(error_msg)
 
         # Ensure token directory exists
-        ensure_directory_exists(self.token_file.parent, self.logger)
+        ensure_directory_exists(self.cfg.token_file.parent, self.logger)
 
         # Initialize the service
         self.service = self._get_service()
@@ -77,11 +71,11 @@ class GoogleCalendarClient:
         creds = None
 
         # Load existing token if available
-        if self.token_file.exists():
+        if self.cfg.token_file.exists():
             try:
-                with open(self.token_file, 'r') as token:
+                with open(self.cfg.token_file, 'r') as token:
                     token_data = json.load(token)
-                    creds = Credentials.from_authorized_user_info(token_data, self.scopes)
+                    creds = Credentials.from_authorized_user_info(token_data, self.cfg.scopes)
                 self.logger.debug("Loaded existing token from file")
             except Exception as e:
                 self.logger.warning(f"Failed to load existing token: {e}")
@@ -99,7 +93,7 @@ class GoogleCalendarClient:
             if not creds:
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(
-                        str(self.credentials_file), self.scopes
+                        str(self.cfg.credentials_file), self.cfg.scopes
                     )
                     # Try local server first, fallback to console
                     try:
@@ -110,9 +104,8 @@ class GoogleCalendarClient:
                         creds = flow.run_console()
                         self.logger.info("OAuth flow completed via console")
                 except Exception as e:
-                    error_msg = f"OAuth authentication failed: {e}"
-                    self.logger.error(error_msg)
-                    raise ConfigurationError(error_msg)
+                    self.logger.error(f"OAuth authentication failed: {e}")
+                    raise GoogleCalendarError(f"OAuth authentication failed: {e}") from e
 
             # Save the credentials for future runs
             try:
@@ -124,7 +117,7 @@ class GoogleCalendarClient:
                     'client_secret': creds.client_secret,
                     'scopes': creds.scopes
                 }
-                with open(self.token_file, 'w') as token:
+                with open(self.cfg.token_file, 'w') as token:
                     json.dump(token_data, token)
                 self.logger.debug("Saved token to file")
             except Exception as e:
@@ -136,23 +129,31 @@ class GoogleCalendarClient:
             self.logger.info("Google Calendar service initialized successfully")
             return service
         except Exception as e:
-            error_msg = f"Failed to build Google Calendar service: {e}"
-            self.logger.error(error_msg)
-            raise ConfigurationError(error_msg)
+            self.logger.error(f"Failed to build Google Calendar service: {e}")
+            raise GoogleCalendarError(f"Failed to initialize Google Calendar service: {e}") from e
 
-    def list_past_events(self, days: int, limit: int, calendar_id: str, filter_group_events: bool = True) -> List[Dict[str, Any]]:
+    def list_past_events(self, days: Optional[int] = None, limit: Optional[int] = None, calendar_id: Optional[str] = None, filter_group_events: Optional[bool] = None) -> List[Dict[str, Any]]:
         """
         List past events from Google Calendar.
 
         Args:
-            days: Number of past days to look back
-            limit: Maximum number of events to return
-            calendar_id: Calendar ID to query
-            filter_group_events: If True, only return events with 2 or more attendees
+            days: Number of past days to look back (uses config default if None)
+            limit: Maximum number of events to return (uses config default if None)
+            calendar_id: Calendar ID to query (uses config default if None)
+            filter_group_events: If True, only return events with 2 or more attendees (uses config default if None)
 
         Returns:
             List of event dictionaries with attendees, description, attachments
+
+        Raises:
+            GoogleCalendarError: If API call fails
         """
+        # Use config defaults if parameters not provided
+        days = days if days is not None else self.cfg.default_past_days
+        limit = limit if limit is not None else self.cfg.max_results
+        calendar_id = calendar_id if calendar_id is not None else self.cfg.calendar_id
+        filter_group_events = filter_group_events if filter_group_events is not None else self.cfg.filter_group_events_only
+
         # Calculate time range
         now = datetime.utcnow()
         time_max = now.isoformat() + 'Z'
@@ -187,9 +188,8 @@ class GoogleCalendarClient:
             return events
 
         except Exception as e:
-            error_msg = f"Failed to list calendar events: {e}"
-            self.logger.error(error_msg)
-            raise ConfigurationError(error_msg)
+            self.logger.error(f"Failed to list calendar events: {e}")
+            raise GoogleCalendarError(f"Failed to list calendar events: {e}") from e
 
     @staticmethod
     def parse_event_start_local(event: Dict[str, Any]) -> str:

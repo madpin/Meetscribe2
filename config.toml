@@ -39,6 +39,14 @@ hard_limit_files = 25
 [ui]
 selection_page_size = 10
 
+[logging]
+# Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+level = "INFO"
+# Path to log file (optional). If not set, defaults to ~/.meetscribe/meetscribe.log
+log_file = "~/.meetscribe/meetscribe.log"
+# Enable file logging
+enable_file_logging = true
+
 [google]
 # Google Calendar integration settings
 credentials_file = "~/.meetscribe/google/credentials.json"

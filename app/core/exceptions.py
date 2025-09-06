@@ -34,3 +34,27 @@ class ShortcutError(TerminalAppError):
     """Raised when there's an issue with shortcut configuration or execution."""
 
     pass
+
+
+class ExternalServiceError(TerminalAppError):
+    """Raised when external service calls fail (API, network, etc.)."""
+
+    pass
+
+
+class AuthenticationError(ExternalServiceError):
+    """Raised when authentication fails with external services."""
+
+    pass
+
+
+class TranscriptionError(ExternalServiceError):
+    """Raised when audio transcription fails."""
+
+    pass
+
+
+class GoogleCalendarError(ExternalServiceError):
+    """Raised when Google Calendar API operations fail."""
+
+    pass

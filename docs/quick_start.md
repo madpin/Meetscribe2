@@ -96,6 +96,8 @@ The interface shows page information and includes:
 
 **⚠️ SECURITY WARNING:** Never commit API keys to version control. Always use `config.local.toml` for sensitive configuration.
 
+**Configuration is validated at startup via Pydantic models for type safety and consistency.**
+
 Create `config.local.toml` in the project root (it's already in `.gitignore`):
 
 ```toml
