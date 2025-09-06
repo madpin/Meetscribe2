@@ -16,6 +16,7 @@ Meetscribe is a tool that automatically converts audio recordings of meetings in
 - **📋 Newest-First Ordering:** All file lists are automatically sorted by last modified time (newest first) for better UX.
 - **🛡️ Safe Batch Processing:** Configurable soft and hard limits prevent accidental large batch runs with user confirmation prompts.
 - **📦 Standalone Application:** Packaged as a single, standalone binary file, so you can distribute it as a self-contained application that runs on its own without requiring users to install Python or any other dependencies.
+- **📅 Google Calendar Integration:** List past calendar events with attendees, descriptions, and attachment names directly from your terminal.
 
 ## 🏗️ Architecture Overview
 
@@ -49,6 +50,60 @@ python -m app.cli process list /path/to/audio/files
 # Process a single file
 python -m app.cli process file /path/to/audio.wav
 ```
+
+## 📅 Google Calendar Integration
+
+Meetscribe now includes Google Calendar integration to list past events with attendees, descriptions, and attachment names.
+
+### Quick Usage
+
+```bash
+# List past calendar events (last 7 days by default)
+python -m app.cli calendar past
+
+# List past 3 days of events
+python -m app.cli calendar past --days 3
+
+# List up to 20 events
+python -m app.cli calendar past --limit 20
+
+# Use specific calendar ID
+python -m app.cli calendar past --calendar-id your-calendar-id@group.calendar.google.com
+
+# Show all events (including solo events)
+python -m app.cli calendar past --no-group-only
+```
+
+### Setup
+
+1. **Get Google Credentials:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable the Google Calendar API
+   - Create OAuth 2.0 credentials (Desktop application)
+   - Download the `credentials.json` file
+
+2. **Configure Meetscribe:**
+   - Place `credentials.json` at `~/.meetscribe/google/credentials.json` (default)
+   - Or set a custom path in `config.local.toml`:
+     ```toml
+     [google]
+     credentials_file = "/path/to/your/credentials.json"
+     ```
+
+3. **First Run:**
+   - Run `python -m app.cli calendar past`
+   - Your browser will open for OAuth consent
+   - Token will be saved for future runs
+
+### Output
+
+The command displays a Rich-formatted table with:
+- **Start (Local)**: Event start time in your local timezone
+- **Title**: Event title/summary
+- **Attendees**: List of attendee names or emails (Indeed emails show only username)
+- **Description**: Event description (truncated if long)
+- **Attachments**: Names of attached files
 
 ## 🚀 Getting Started
 

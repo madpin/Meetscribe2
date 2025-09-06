@@ -45,6 +45,9 @@ app = typer.Typer(
 process_app = typer.Typer(name="process", help="Process audio files.")
 app.add_typer(process_app)
 
+calendar_app = typer.Typer(name="calendar", help="Google Calendar commands.")
+app.add_typer(calendar_app)
+
 
 def interactive_select_file(files: list, output_folder: Path) -> Optional[list]:
     """
@@ -471,6 +474,98 @@ def process_file(
     with open(output_file, "w") as f:
         f.write(notes)
     ctx.logger.info(f"Notes saved to {output_file}")
+
+
+def _truncate_description(description: str, max_length: int = 80) -> str:
+    """Truncate description to max_length with ellipsis if needed."""
+    if len(description) <= max_length:
+        return description
+    return description[:max_length - 3] + "…"
+
+
+def _truncate_attendees(attendees: list, max_count: int = 5) -> str:
+    """Truncate attendee list to max_count with summary if needed."""
+    if not attendees:
+        return "-"
+    if len(attendees) <= max_count:
+        return ", ".join(attendees)
+    remaining = len(attendees) - max_count
+    return f"{', '.join(attendees[:max_count])} +{remaining} more"
+
+
+def _truncate_attachments(attachments: list, max_count: int = 3) -> str:
+    """Truncate attachment list to max_count with summary if needed."""
+    if not attachments:
+        return "-"
+    if len(attachments) <= max_count:
+        return ", ".join(attachments)
+    remaining = len(attachments) - max_count
+    return f"{', '.join(attachments[:max_count])} +{remaining} more"
+
+
+@calendar_app.command("past")
+def calendar_past(
+    days: Optional[int] = typer.Option(None, "--days", "-d", help="Number of past days to list (defaults to config)."),
+    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="Max number of events (defaults to config)."),
+    calendar_id: Optional[str] = typer.Option(None, "--calendar-id", help="Calendar ID (defaults to config)."),
+    group_only: Optional[bool] = typer.Option(None, "--group-only/--no-group-only", help="Only show events with 2 or more attendees (defaults to config)."),
+):
+    """
+    List past Google Calendar events with attendees, description, and attachment names.
+    """
+    ctx = get_app_context()
+    console = Console()
+
+    # Get configuration defaults
+    google_config = ctx.config.get("google", {})
+    effective_days = days if days is not None else google_config.get("default_past_days", 7)
+    effective_limit = limit if limit is not None else google_config.get("max_results", 50)
+    effective_calendar_id = calendar_id if calendar_id is not None else google_config.get("calendar_id", "primary")
+    effective_group_only = group_only if group_only is not None else google_config.get("filter_group_events_only", True)
+
+    ctx.logger.info(f"Listing past {effective_days} days of calendar events (limit: {effective_limit}, group-only: {effective_group_only})")
+
+    try:
+        from app.integrations.google_calendar import GoogleCalendarClient
+
+        client = GoogleCalendarClient(ctx)
+        events = client.list_past_events(
+            days=effective_days,
+            limit=effective_limit,
+            calendar_id=effective_calendar_id,
+            filter_group_events=effective_group_only
+        )
+
+        if not events:
+            console.print("[yellow]No past events found for the specified time range.[/yellow]")
+            return
+
+        # Create table
+        table = Table(title=f"Past Calendar Events (Last {effective_days} Days)")
+        table.add_column("Start (Local)", style="cyan", justify="left")
+        table.add_column("Title", style="green")
+        table.add_column("Attendees", style="yellow")
+        table.add_column("Description", style="blue")
+        table.add_column("Attachments", style="magenta")
+
+        # Add rows
+        for event in events:
+            start_str = GoogleCalendarClient.parse_event_start_local(event)
+            title = event.get('summary', '-')
+            attendees = GoogleCalendarClient.extract_attendee_names(event)
+            attendees_str = _truncate_attendees(attendees)
+            description = _truncate_description(event.get('description', '-'))
+            attachments = GoogleCalendarClient.extract_attachment_titles(event)
+            attachments_str = _truncate_attachments(attachments)
+
+            table.add_row(start_str, title, attendees_str, description, attachments_str)
+
+        console.print(table)
+
+    except Exception as e:
+        ctx.logger.error(f"Failed to list calendar events: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

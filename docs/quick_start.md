@@ -115,11 +115,39 @@ hard_limit_files = 25     # Abort processing above this count
 
 The app automatically merges `config.local.toml` over `config.toml`, keeping your API key secure.
 
+#### Google Calendar Integration (Optional)
+
+Meetscribe includes Google Calendar integration for listing past events:
+
+```bash
+# Install Google API dependencies
+pip install google-api-python-client google-auth google-auth-oauthlib
+
+# Configure Google Calendar (optional)
+echo '[google]
+credentials_file = "~/.meetscribe/google/credentials.json"
+token_file = "~/.meetscribe/google/token.json"
+default_past_days = 7
+max_results = 50
+filter_group_events_only = true' >> config.local.toml
+
+# List past calendar events
+python -m app.cli calendar past
+```
+
+**Setup Steps:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Google Calendar API
+3. Create OAuth Desktop credentials
+4. Download `credentials.json` to `~/.meetscribe/google/credentials.json`
+5. Run `python -m app.cli calendar past` for first-time OAuth
+
 #### New Configuration Options
 
 - **`[ui].selection_page_size`** (default: 10): Number of files shown per page in interactive selection
 - **`[processing].soft_limit_files`** (default: 10): Show confirmation prompt when processing more files than this
 - **`[processing].hard_limit_files`** (default: 25): Abort with error when attempting to process more files than this
+- **`[google].filter_group_events_only`** (default: true): Only show events with 2 or more attendees
 
 ## 🧪 Testing
 

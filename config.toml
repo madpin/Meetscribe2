@@ -38,3 +38,13 @@ hard_limit_files = 25
 
 [ui]
 selection_page_size = 10
+
+[google]
+# Google Calendar integration settings
+credentials_file = "~/.meetscribe/google/credentials.json"
+token_file = "~/.meetscribe/google/token.json"
+scopes = ["https://www.googleapis.com/auth/calendar.readonly"]
+calendar_id = "primary"
+default_past_days = 3
+max_results = 50
+filter_group_events_only = true

@@ -114,11 +114,94 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 **`[ui]`**
 - **`selection_page_size`** (integer, optional): Number of files shown per page in interactive selection mode. Default is 10.
 
+**`[google]`**
+- **`credentials_file`** (string, optional): Path to Google OAuth credentials file (default: `"~/.meetscribe/google/credentials.json"`)
+- **`token_file`** (string, optional): Path where OAuth tokens are stored (default: `"~/.meetscribe/google/token.json"`)
+- **`scopes`** (array, optional): OAuth scopes for Google API access (default: `["https://www.googleapis.com/auth/calendar.readonly"]`)
+- **`calendar_id`** (string, optional): Google Calendar ID to query (default: `"primary"`)
+- **`default_past_days`** (integer, optional): Default number of past days to query (default: `7`)
+- **`max_results`** (integer, optional): Default maximum number of events to return (default: `50`)
+- **`filter_group_events_only`** (boolean, optional): Only show events with 2 or more attendees (default: `true`)
+
 #### Configuration Loading
 1. `config.toml` is loaded first (required)
 2. `config.local.toml` is merged over base config if it exists
 3. Deep merge preserves nested structure
 4. Local config takes precedence over base config
+
+## Google Calendar Setup
+
+Meetscribe includes Google Calendar integration to list past events with attendees, descriptions, and attachment names.
+
+### Step-by-Step Setup
+
+1. **Create Google Cloud Project:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google Calendar API:
+     - Navigate to "APIs & Services" > "Library"
+     - Search for "Google Calendar API"
+     - Click "Enable"
+
+2. **Create OAuth Credentials:**
+   - Go to "APIs & Services" > "Credentials"
+   - Click "Create Credentials" > "OAuth client ID"
+   - Choose "Desktop application" as the application type
+   - Download the `credentials.json` file
+
+3. **Configure Meetscribe:**
+   - Place the downloaded `credentials.json` file at: `~/.meetscribe/google/credentials.json`
+   - Or set a custom path in `config.local.toml`:
+     ```toml
+     [google]
+     credentials_file = "/path/to/your/credentials.json"
+     ```
+
+4. **First Run Authentication:**
+   - Run: `python -m app.cli calendar past`
+   - Your browser will open for OAuth consent
+   - Grant the requested permissions
+   - The access token will be saved to `~/.meetscribe/google/token.json` for future runs
+
+### Security Notes
+- **Never commit `credentials.json` or `token.json` to version control**
+- The OAuth scope is limited to read-only calendar access
+- Tokens are stored locally and automatically refreshed when needed
+- You can revoke access anytime in your Google Account settings
+
+### Usage Examples
+
+```bash
+# List past events (last 7 days by default)
+python -m app.cli calendar past
+
+# List past 3 days of events
+python -m app.cli calendar past --days 3
+
+# List up to 20 events
+python -m app.cli calendar past --limit 20
+
+# Use specific calendar
+python -m app.cli calendar past --calendar-id your-calendar-id@group.calendar.google.com
+
+# Show all events (including solo events)
+python -m app.cli calendar past --no-group-only
+
+# Override configuration defaults
+echo '[google]
+default_past_days = 14
+max_results = 100
+filter_group_events_only = false' > config.local.toml
+```
+
+### Output Format
+
+The command displays events in a Rich-formatted table with:
+- **Start (Local)**: Event start time converted to your local timezone
+- **Title**: Event title/summary
+- **Attendees**: Comma-separated list of attendee names (prefers display names over email addresses; Indeed emails show only username)
+- **Description**: Event description (may be truncated for long descriptions)
+- **Attachments**: Names of files attached to the event
 
 ## Usage
 
