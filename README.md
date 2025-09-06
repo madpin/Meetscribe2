@@ -8,7 +8,7 @@ Meetscribe is a tool that automatically converts audio recordings of meetings in
 
 ## ✨ Features
 
-- **🤖 Automated Transcription and Summarization:** Turn raw audio into polished notes without lifting a finger. The tool intelligently processes recordings to create a full transcript, a high-level **summary**, a list of **key decisions**, and clear **action items**.
+- **🤖 Automated Transcription and Summarization:** Turn raw audio into polished notes without lifting a finger. The tool intelligently processes recordings to create a full transcript, a high-level **summary**, a list of **key decisions**, clear **action items**, and a **speaker timeline** with diarization.
 - **📁 Effortless Batch Processing:** Simply point the tool to a folder of your meeting recordings. It automatically finds and processes all supported audio files in one go, saving you the tedious task of handling them one by one.
 - **🖥️ Simple Command-Line Operation:** Designed for efficiency, Meetscribe operates through a clean and simple command-line interface. It provides a fast, scriptable way to manage your meeting notes directly from the terminal.
 - **📦 Standalone Application:** Packaged as a single, standalone binary file, so you can distribute it as a self-contained application that runs on its own without requiring users to install Python or any other dependencies.

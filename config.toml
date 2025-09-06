@@ -5,6 +5,24 @@
 # You can get an API key from https://console.deepgram.com/
 api_key = ""
 
+# Model and language
+model = "nova-3"       # Default to Nova-3
+language = "en-US"
+
+# Formatting
+smart_format = true    # punctuation, capitalization, etc.
+
+# Diarization
+diarize = true
+diarize_speakers = 0   # 0 = unset; set >0 to hint expected speakers
+min_speaker_gap = 0.0  # seconds; 0.0 = unset
+max_speaker_gap = 0.0  # seconds; 0.0 = unset
+
+# Enrichments
+summarize = false # "v2" as altenative
+detect_topics = false
+intents = false
+
 [paths]
 # Default folder for storing meeting notes.
 output_folder = "~/Documents/Meetscribe"
