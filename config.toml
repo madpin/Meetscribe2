@@ -26,3 +26,8 @@ intents = false
 [paths]
 # Default folder for storing meeting notes.
 output_folder = "~/Documents/Meetscribe"
+
+[processing]
+# When true, reprocess audio files even if the output .txt already exists (overwrite).
+# Default is false, which skips files that already have outputs.
+reprocess = false

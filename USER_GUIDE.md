@@ -106,6 +106,9 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 **`[paths]`**
 - **`output_folder`** (string, optional): Directory for generated notes (default: `~/Documents/Meetscribe`)
 
+**`[processing]`**
+- **`reprocess`** (boolean, optional): When true, reprocess audio files even if output .txt already exists (overwrite). Default is false, which skips files with existing outputs.
+
 #### Configuration Loading
 1. `config.toml` is loaded first (required)
 2. `config.local.toml` is merged over base config if it exists
@@ -136,6 +139,14 @@ meetscribe process dir "/Users/you/Meetings/2024-09-15"
 
 # Windows
 meetscribe process dir "C:\Users\you\Meetings"
+```
+
+**Default Behavior**: Meetscribe skips processing audio files when the corresponding output `.txt` file already exists. This saves time and API costs.
+
+**Force Reprocessing**: To reprocess and overwrite existing outputs, use the `--reprocess` flag:
+```bash
+# Force reprocessing of all files
+meetscribe process dir <path_to_audio_folder> --reprocess
 ```
 
 **Exit Codes**:
