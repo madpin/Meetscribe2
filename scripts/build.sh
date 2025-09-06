@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build script for AIO Terminal Template with optional code signing
+# Build script for Meetscribe with optional code signing
 
 set -e  # Exit on any error
 
-echo "🚀 Building AIO Terminal Template..."
+echo "🚀 Building Meetscribe..."
 
 # Check if we're on macOS
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -26,17 +26,17 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 else
     echo "🐧 Building for non-macOS platform"
-    pyinstaller aio_terminal_template.spec
+    pyinstaller meetscribe.spec
 fi
 
 echo ""
 echo "🎉 Build complete!"
-echo "📁 Executable location: dist/aio_terminal_template"
+echo "📁 Executable location: dist/meetscribe"
 
 # Test the executable
-if [[ -f "dist/aio_terminal_template" ]]; then
+if [[ -f "dist/meetscribe" ]]; then
     echo "🧪 Testing executable..."
-    ./dist/aio_terminal_template --help
+    ./dist/meetscribe --help
     echo "✅ Executable works!"
 else
     echo "❌ Build failed - executable not found"
