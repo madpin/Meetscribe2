@@ -1,12 +1,2 @@
-# Local configuration overrides.
-# These settings will be merged with the default config.toml.
-
-[viewer]
-log_level = "DEBUG"
-
-[network]
-api_base_url = "https://api.dev.example.com"
-timeout = 30
-
-[updates]
-github_repo = "my-fork/my-repo"
+[deepgram]
+api_key = "1e7e5ae51bd8216a9d99737389fad6e9fe2ea234"

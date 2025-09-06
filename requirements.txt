@@ -1,0 +1,4 @@
+typer
+rich
+toml
+deepgram-sdk

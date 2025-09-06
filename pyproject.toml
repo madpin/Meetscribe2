@@ -1,7 +1,7 @@
 [project]
-name = "aio_terminal_template"
+name = "meetscribe"
 version = "0.1.0"
-description = "A modern terminal app template with PyInstaller packaging"
+description = "A tool to automatically convert audio recordings of meetings into structured, actionable notes."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -22,13 +22,8 @@ classifiers = [
 dependencies = [
     "typer",
     "rich",
-    "pynput",
-    "pyautogui",
-    "pyperclip",
-    "requests",
-    "Pillow",
-    "python-daemon",
     "toml",
+    "deepgram-sdk",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +36,7 @@ dev = [
 ]
 
 [project.scripts]
-aio_terminal_template = "app.cli:app"
+meetscribe = "app.cli:app"
 
 [tool.setuptools]
 packages = ["app"]

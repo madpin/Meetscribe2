@@ -29,10 +29,10 @@ python -m app.cli action screenshot.full
 **Building Executables:**
 ```bash
 # PyInstaller - creates a single executable file
-pyinstaller --onefile --name aio_terminal_template --add-data "config.toml:." app/cli.py
+pyinstaller --onefile --name meetscribe --add-data "config.toml:." app/cli.py
 
 # Test the built executable
-./dist/aio_terminal_template --help
+./dist/meetscribe --help
 ```
 
 ## Project Structure
