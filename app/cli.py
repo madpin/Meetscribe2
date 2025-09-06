@@ -63,7 +63,7 @@ def process_directory(
         print(f"Error: The provided path is not a directory: {audio_directory}")
         raise typer.Exit(code=1)
 
-    supported_formats = [".wav", ".mp3", ".m4a"]
+    supported_formats = [".wav", ".mp3", ".m4a", ".aac"]
     audio_files = [
         p for p in audio_path.iterdir() if p.suffix.lower() in supported_formats
     ]

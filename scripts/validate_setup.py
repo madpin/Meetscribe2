@@ -107,7 +107,7 @@ class SetupValidator:
                     if project_name in [
                         "my-terminal-app",
                         "myapp",
-                        "aio_terminal_template",
+                        "meetscribe",
                         "{{PROJECT_NAME}}",
                     ]:
                         self.warnings.append(

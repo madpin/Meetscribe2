@@ -128,13 +128,13 @@ security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k YOUR_KEYCH
 **Check if app is properly signed:**
 ```bash
 # Verify signature
-codesign --verify --verbose dist/aio_terminal_template
+codesign --verify --verbose dist/meetscribe
 
 # Display signature details
-codesign --display --verbose=2 dist/aio_terminal_template
+codesign --display --verbose=2 dist/meetscribe
 
 # Check entitlements
-codesign --display --entitlements - dist/aio_terminal_template
+codesign --display --entitlements - dist/meetscribe
 ```
 
 ### Common Errors
@@ -158,13 +158,13 @@ For even better security (optional), you can notarize your app with Apple:
 
 ```bash
 # Create a zip file for notarization
-ditto -c -k --keepParent dist/aio_terminal_template aio_terminal_template.zip
+ditto -c -k --keepParent dist/meetscribe meetscribe.zip
 
 # Submit for notarization (requires app-specific password)
-xcrun notarytool submit aio_terminal_template.zip --keychain-profile "AC_PASSWORD" --wait
+xcrun notarytool submit meetscribe.zip --keychain-profile "AC_PASSWORD" --wait
 
 # Staple the notarization to your app
-xcrun stapler staple dist/aio_terminal_template
+xcrun stapler staple dist/meetscribe
 ```
 
 **Setup for notarization:**

@@ -30,7 +30,7 @@ def setup_logging(
         Configured logger instance
     """
     # Create logger
-    logger = logging.getLogger("aio_terminal_template")
+    logger = logging.getLogger("meetscribe")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # Remove existing handlers to avoid duplicates
@@ -74,7 +74,7 @@ def setup_logging(
     return logger
 
 
-def get_logger(name: str = "aio_terminal_template") -> logging.Logger:
+def get_logger(name: str = "meetscribe") -> logging.Logger:
     """
     Get a logger instance for the specified name.
 

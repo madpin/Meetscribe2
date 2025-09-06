@@ -1,6 +1,6 @@
 # Meetscribe
 
-[![CI](https://github.com/{{OWNER_NAME}}/{{REPO_NAME}}/workflows/CI/badge.svg)](https://github.com/{{OWNER_NAME}}/{{REPO_NAME}}/actions)
+[![CI](https://github.com/madpin/Meetscribe2/workflows/CI/badge.svg)](https://github.com/madpin/Meetscribe2/actions)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -34,7 +34,7 @@ app/
 
 ### 🛠️ For Developers
 
-For instructions on how to set up a development environment, build the project, and contribute, please see the [Developer Guide](./docs/DEVELOPMENT.md).
+For instructions on how to set up a development environment, build the project, and contribute, please see the [Developer Guide](./DEVELOPER.md).
 
 ## 🚀 Build Method
 
@@ -47,6 +47,8 @@ pyinstaller meetscribe.spec
 # Test the built executable
 ./dist/meetscribe --help
 ```
+
+**Note:** The `meetscribe.spec` file bundles `config.toml` with the executable, so users don't need to install configuration files separately.
 
 **Benefits:**
 - ✅ **Single file** - Easy to distribute

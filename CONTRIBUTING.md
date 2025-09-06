@@ -1,13 +1,13 @@
-# 🤝 Contributing to AIO Terminal Template
+# 🤝 Contributing to Meetscribe
 
 Thank you for your interest in contributing! This document provides guidelines and information for contributors.
 
 ## 🚀 Quick Start
 
 1. **Fork** the repository
-2. **Clone** your fork: `git clone https://github.com/your-username/aio-terminal-template.git`
+2. **Clone** your fork: `git clone https://github.com/your-username/meetscribe.git`
 3. **Create** a feature branch: `git checkout -b feature/amazing-feature`
-4. **Set up** development environment (see [DEVELOPMENT.md](docs/DEVELOPMENT.md))
+4. **Set up** development environment (see [DEVELOPER.md](DEVELOPER.md))
 5. **Make** your changes
 6. **Test** your changes: `python -m pytest`
 7. **Commit** your changes: `git commit -m 'Add amazing feature'`
@@ -49,20 +49,14 @@ Thank you for your interest in contributing! This document provides guidelines a
 - Add code comments for complex logic
 - Update examples and tutorials
 
-## 📝 Adding New Actions
+## 📝 Adding New Features
 
-1. Create `app/actions/your_action.py`
-2. Implement the action function:
-```python
-def your_action(config):
-    """Description of what your action does"""
-    # Your implementation here
-    return "Result message"
-```
-
-3. Add tests in `tests/test_your_action.py`
-4. Update documentation
-5. Test the action: `python -m app.cli action your_action`
+1. Create new modules in `app/` directory
+2. Implement functionality following the existing patterns
+3. Add CLI commands in `app/cli.py` using Typer
+4. Add tests in `tests/test_your_feature.py`
+5. Update documentation
+6. Test the new feature: `python -m app.cli --help`
 
 ## 🔧 Build System Changes
 
@@ -184,4 +178,4 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 ---
 
-Thank you for contributing to AIO Terminal Template! 🚀
+Thank you for contributing to Meetscribe! 🚀

@@ -40,6 +40,25 @@ class Transcriber:
             raise ValueError("Deepgram API key not found in config.toml")
         return api_key
 
+    def _get_mimetype(self, file_path: Path) -> str:
+        """
+        Get the appropriate MIME type for an audio file based on its extension.
+
+        Args:
+            file_path: The path to the audio file.
+
+        Returns:
+            The MIME type string for the file.
+        """
+        extension = file_path.suffix.lower()
+        mimetypes = {
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+            ".m4a": "audio/mp4",
+            ".aac": "audio/aac"
+        }
+        return mimetypes.get(extension, "audio/wav")
+
     def process_audio_file(self, file_path: Path) -> str:
         """
         Transcribe and analyze an audio file.
@@ -54,7 +73,8 @@ class Transcriber:
 
         try:
             with open(file_path, "rb") as audio_file:
-                source = {"buffer": audio_file.read(), "mimetype": "audio/wav"}
+                mimetype = self._get_mimetype(file_path)
+                source = {"buffer": audio_file.read(), "mimetype": mimetype}
                 options = PrerecordedOptions(
                     model="nova-2",
                     smart_format=True,

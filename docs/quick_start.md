@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Welcome to the AIO Terminal Template! This guide will help you get started with building and using your own terminal application.
+Welcome to Meetscribe! This guide will help you get started with converting your meeting audio recordings into structured notes.
 
 ## 🚀 Quick Development Setup
 
@@ -8,14 +8,17 @@ Welcome to the AIO Terminal Template! This guide will help you get started with 
 
 ```bash
 git clone <your-repo-url>
-cd terminal-app-template
+cd meetscribe
 
 # Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install typer rich pynput pyautogui pyperclip requests Pillow python-daemon toml flake8 pytest pyinstaller
+pip install -r requirements.txt
+
+# For development (optional)
+pip install flake8 pytest pyinstaller
 ```
 
 ### 2. Test the Application
@@ -24,92 +27,56 @@ pip install typer rich pynput pyautogui pyperclip requests Pillow python-daemon 
 # Test CLI
 python -m app.cli --help
 
-# Test screenshot action (implemented)
-python -m app.cli action screenshot.full
-
-# View configuration
-python -m app.cli config show
+# Test audio processing (replace with your audio folder path)
+python -m app.cli process dir /path/to/your/audio/files
 ```
 
 ### 3. Build Standalone Executable
 
 ```bash
 # Build with PyInstaller
-pyinstaller --onefile --name aio_terminal_template --add-data "config.toml:." app/cli.py
+pyinstaller --onefile --name meetscribe --add-data "config.toml:." app/cli.py
 
 # Test the built executable
-./dist/aio_terminal_template --help
+./dist/meetscribe --help
 ```
 
 The executable will be created in the `dist/` directory and can be distributed to any machine (Linux, macOS, or Windows) without requiring Python to be installed.
 
-## 🔄 Updating Your Application
-
-### For End Users (Using Built Executable)
-If you have a pre-built executable, you can update it automatically:
-
-```bash
-# Check for new versions
-./{{PROJECT_NAME}} update check
-
-# Download and install the latest version
-./{{PROJECT_NAME}} update now
-```
-
-**Keyboard shortcuts:**
-- `Ctrl+Shift+U`: Check for updates
-- `Ctrl+Shift+D`: Auto-update to latest version
-
-The update process automatically creates a backup of your current executable and safely replaces it with the new version.
-
-### For Developers
-When running from source, update normally:
-```bash
-git pull
-pip install -e .
-```
-
 ## 🎯 What Works Now
 
 ### ✅ Working Features
-- **Screenshot Action:** Captures full-screen screenshots and copies path to clipboard
-- **CLI Interface:** Full command-line interface with action execution
+- **Audio Processing:** Converts audio recordings into structured meeting notes
+- **Batch Processing:** Process entire directories of audio files automatically
+- **CLI Interface:** Full command-line interface with audio processing commands
 - **Configuration System:** TOML-based configuration with local overrides
-- **Action Registry:** Automatically discovers and loads action modules
+- **Deepgram Integration:** AI-powered transcription and analysis
 
 ### ⌨️ Available Commands
 
 ```bash
-# Run actions directly
-python -m app.cli action screenshot.full
+# Process audio files from a directory
+python -m app.cli process dir /path/to/audio/files
 
-# Start with global shortcuts (framework ready)
-python -m app.cli run
-
-# Start without shortcuts (safe mode)
-python -m app.cli run --safe-mode
-
-# Manage configuration
-python -m app.cli config show
-python -m app.cli config edit
-
-# View logs
-python -m app.cli logs tail
+# View available commands
+python -m app.cli --help
 ```
 
 ## ⚙️ Configuration
 
-The application's behavior is controlled by `config.toml`. Create `config.local.toml` for local overrides:
+**⚠️ SECURITY WARNING:** Never commit API keys to version control. Always use `config.local.toml` for sensitive configuration.
+
+Create `config.local.toml` in the project root (it's already in `.gitignore`):
 
 ```toml
-[paths]
-screenshots_folder = "~/my_screenshots"
+[deepgram]
+api_key = "your_deepgram_api_key_here"
 
-[shortcuts.screenshot_full]
-keys = "<ctrl>+<shift>+s"
-action = "screenshot.full"
-enabled = true
+[paths]
+output_folder = "~/Documents/Meetscribe"
 ```
+
+The app automatically merges `config.local.toml` over `config.toml`, keeping your API key secure.
 
 ## 🧪 Testing
 
@@ -118,14 +85,14 @@ enabled = true
 python -m pytest -v
 
 # Run specific test file
-python -m pytest tests/test_screenshot_action.py -v
+python -m pytest tests/test_config.py -v
 ```
 
 ## 📝 Next Steps
 
-1. **Add More Actions:** Implement clipboard clean, network ping, and update check actions
-2. **Build the Live Viewer:** Complete the Rich-based action log viewer
-3. **Add GitHub Actions:** Set up CI/CD workflows for automated testing and releases
-4. **Customize:** Modify the configuration and add your own actions
+1. **Get a Deepgram API Key:** Sign up at [console.deepgram.com](https://console.deepgram.com) for transcription services
+2. **Configure Your API Key:** Add it to `config.local.toml` for secure storage
+3. **Test with Audio Files:** Process some meeting recordings and review the output
+4. **Customize Output Location:** Modify the output folder path in your configuration
 
-For detailed development instructions, see the [Developer Guide](./DEVELOPMENT.md).
+For detailed development instructions, see the [Developer Guide](../DEVELOPER.md).
