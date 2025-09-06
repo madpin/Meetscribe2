@@ -115,6 +115,11 @@ Create `config.local.toml` in the project root:
 ```toml
 [deepgram]
 api_key = "YOUR_DEEPGRAM_API_KEY"
+model = "nova-3"          # Default Nova-3 model
+diarize = true            # Enable speaker diarization
+diarize_speakers = 2      # Hint for expected speakers (optional)
+min_speaker_gap = 0.5     # Min gap between speakers in seconds (optional)
+max_speaker_gap = 3.0     # Max gap between speakers in seconds (optional)
 ```
 
 **Important:** Add `config.local.toml` to your `.gitignore` or ensure it's never staged.
@@ -297,6 +302,7 @@ def test_format_results_with_complete_response():
    - ✅ Notes file contains:
      - Meeting summary
      - Key decisions and action items (may be empty)
+     - Speaker Timeline (may show "- None" if diarization unavailable)
      - Full transcript after `---` separator
 
 #### Log Verification

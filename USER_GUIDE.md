@@ -17,6 +17,7 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 - **Summary**: Concise overview of the meeting content
 - **Key decisions**: Important topics and decisions discussed
 - **Action items**: Tasks, intents, and follow-ups identified
+- **Speaker Timeline**: Speaker-labeled conversation timeline (when diarization is available)
 - **Full transcript**: Complete word-for-word transcription
 
 ## What You Need
@@ -91,6 +92,16 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 
 **`[deepgram]`**
 - **`api_key`** (string, required): Your Deepgram API key from [console.deepgram.com](https://console.deepgram.com)
+- **`model`** (string, optional): Deepgram model to use (default: `"nova-3"`)
+- **`language`** (string, optional): Language code (default: `"en-US"`)
+- **`smart_format`** (boolean, optional): Enable punctuation and capitalization (default: `true`)
+- **`diarize`** (boolean, optional): Enable speaker diarization (default: `true`)
+- **`diarize_speakers`** (integer, optional): Hint for expected number of speakers (default: `0` = unset)
+- **`min_speaker_gap`** (float, optional): Minimum gap between speakers in seconds (default: `0.0` = unset)
+- **`max_speaker_gap`** (float, optional): Maximum gap between speakers in seconds (default: `0.0` = unset)
+- **`summarize`** (string, optional): Summarization model version (default: `"v2"`)
+- **`detect_topics`** (boolean, optional): Enable topic detection (default: `true`)
+- **`intents`** (boolean, optional): Enable intent analysis (default: `true`)
 
 **`[paths]`**
 - **`output_folder`** (string, optional): Directory for generated notes (default: `~/Documents/Meetscribe`)
@@ -158,6 +169,11 @@ For each audio file (e.g., `meeting1.wav`), Meetscribe generates `meeting1.txt` 
 - [Action item 2]
 - None  # If no action items detected
 
+## Speaker Timeline
+- Speaker 0: [Speaker 0's transcript segments]
+- Speaker 1: [Speaker 1's transcript segments]
+- None  # If diarization data unavailable
+
 ---
 
 ## Full Transcript
@@ -168,6 +184,7 @@ For each audio file (e.g., `meeting1.wav`), Meetscribe generates `meeting1.txt` 
 - **Summary**: AI-generated overview from Deepgram's summarization
 - **Key Decisions**: Topics detected by Deepgram's topic detection
 - **Action Items**: Intents detected by Deepgram's intent analysis
+- **Speaker Timeline**: Speaker-labeled conversation segments (when diarization is enabled and available)
 - **Transcript**: Full speech-to-text conversion with smart formatting
 
 ### Deepgram Integration
@@ -175,8 +192,9 @@ For each audio file (e.g., `meeting1.wav`), Meetscribe generates `meeting1.txt` 
 Meetscribe uses [Deepgram](https://deepgram.com) for AI-powered audio processing:
 
 **Features Used:**
-- **Model**: `nova-2` (latest speech recognition model)
+- **Model**: `nova-3` (latest speech recognition model, configurable)
 - **Smart Formatting**: Improved punctuation and capitalization
+- **Diarization**: Speaker identification and labeling (enabled by default)
 - **Summarization**: `v2` AI-generated meeting summaries
 - **Topic Detection**: Automatic identification of key topics
 - **Intent Analysis**: Detection of action items and tasks
