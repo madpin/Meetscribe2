@@ -59,8 +59,9 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     config = toml.load(config_path)
 
     if local_config_path.is_file():
+        # Use print for startup messages before logging is initialized
         print(
-            f"INFO: Loading local configuration overrides from {local_config_path.resolve()}"
+            f"Loading local configuration overrides from {local_config_path.resolve()}"
         )
         local_config = toml.load(local_config_path)
         config = deep_merge(config, local_config)

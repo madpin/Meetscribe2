@@ -38,6 +38,7 @@ class AppContext:
         """Load and parse configuration."""
         try:
             self.config = load_config(self.config_path)
+            # Use print for startup messages before logging is initialized
             print("Configuration loaded successfully")
         except Exception as e:
             print(f"Failed to load configuration: {e}")
