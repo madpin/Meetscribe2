@@ -24,6 +24,8 @@ dependencies = [
     "rich",
     "toml",
     "deepgram-sdk",
+    "mutagen",
+    "readchar",
 ]
 
 [project.optional-dependencies]

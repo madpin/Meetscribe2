@@ -61,9 +61,31 @@ python -m app.cli process dir /path/to/audio/files
 # Force reprocessing of all files, even if outputs exist
 python -m app.cli process dir /path/to/audio/files --reprocess
 
+# Interactive single-file selection from a directory
+python -m app.cli process dir /path/to/audio/files --select
+
+# List audio files in a directory with metadata (filename, size, duration, etc.)
+python -m app.cli process list /path/to/audio/files
+
+# Process a single audio file directly
+python -m app.cli process file /path/to/audio.wav
+python -m app.cli process file /path/to/audio.wav --reprocess
+
 # View available commands
 python -m app.cli --help
 ```
+
+#### Interactive Selection Controls
+When using `--select`, navigate with:
+- **↑/↓ arrows**: Move selection highlight
+- **Space**: Toggle selection of highlighted file (supports multiple selections)
+- **Enter**: Confirm selection (processes all selected files, or highlighted file if none selected)
+- **Esc or 'q'**: Cancel selection
+
+The interface shows a live count of selected files in the title bar and includes:
+- **Done status**: ✓ indicates files that have already been processed (output .txt exists)
+- **Relative timestamps**: Modified dates show both absolute time and relative age (e.g., "2024-01-15 14:30 (2h)")
+- **Default reprocess**: Selected files are reprocessed by default (overwrites existing outputs) unless `--reprocess=false` is explicitly specified
 
 ## ⚙️ Configuration
 

@@ -2,3 +2,5 @@ typer
 rich
 toml
 deepgram-sdk
+mutagen
+readchar
