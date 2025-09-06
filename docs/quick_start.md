@@ -61,9 +61,36 @@ python -m app.cli process dir /path/to/audio/files
 # Force reprocessing of all files, even if outputs exist
 python -m app.cli process dir /path/to/audio/files --reprocess
 
+# Interactive single-file selection from a directory
+python -m app.cli process dir /path/to/audio/files --select
+
+# List audio files in a directory with metadata (filename, size, duration, etc.)
+python -m app.cli process list /path/to/audio/files
+
+# Process a single audio file directly
+python -m app.cli process file /path/to/audio.wav
+python -m app.cli process file /path/to/audio.wav --reprocess
+
 # View available commands
 python -m app.cli --help
 ```
+
+#### Interactive Selection Controls
+When using `--select`, navigate with:
+- **↑/↓ arrows**: Move selection highlight within current page
+- **←/→ arrows**: Navigate between pages (wraps around)
+- **Space**: Toggle selection of highlighted file (supports multiple selections across pages)
+- **Enter**: Confirm selection (processes all selected files, or highlighted file if none selected)
+- **Esc or 'q'**: Cancel selection
+
+The interface shows page information and includes:
+- **Pagination**: Shows "Page X/Y — Showing A-B of N" in the title
+- **Page size**: Configurable via `[ui].selection_page_size` (default: 10)
+- **Done status**: ✓ indicates files that have already been processed (output .txt exists)
+- **Relative timestamps**: Modified dates show both absolute time and relative age (e.g., "2024-01-15 14:30 (2h)")
+- **Newest first**: Files are automatically sorted by last modified time
+- **Lazy loading**: Duration is computed only for visible page items for better performance
+- **Default reprocess**: Selected files are reprocessed by default (overwrites existing outputs) unless `--reprocess=false` is explicitly specified
 
 ## ⚙️ Configuration
 
@@ -77,9 +104,22 @@ api_key = "your_deepgram_api_key_here"
 
 [paths]
 output_folder = "~/Documents/Meetscribe"
+
+[ui]
+selection_page_size = 10  # Items per page in --select mode
+
+[processing]
+soft_limit_files = 10     # Prompt for confirmation above this count
+hard_limit_files = 25     # Abort processing above this count
 ```
 
 The app automatically merges `config.local.toml` over `config.toml`, keeping your API key secure.
+
+#### New Configuration Options
+
+- **`[ui].selection_page_size`** (default: 10): Number of files shown per page in interactive selection
+- **`[processing].soft_limit_files`** (default: 10): Show confirmation prompt when processing more files than this
+- **`[processing].hard_limit_files`** (default: 25): Abort with error when attempting to process more files than this
 
 ## 🧪 Testing
 

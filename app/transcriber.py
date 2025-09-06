@@ -10,6 +10,18 @@ from deepgram import DeepgramClient, PrerecordedOptions
 from app.core.context import AppContext
 
 
+# Supported audio file extensions
+SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".aac"}
+
+# MIME type mapping for supported extensions
+MIMETYPE_BY_EXT = {
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac"
+}
+
+
 class Transcriber:
     """
     A class to handle transcription and analysis of audio files.
@@ -52,13 +64,7 @@ class Transcriber:
             The MIME type string for the file.
         """
         extension = file_path.suffix.lower()
-        mimetypes = {
-            ".wav": "audio/wav",
-            ".mp3": "audio/mpeg",
-            ".m4a": "audio/mp4",
-            ".aac": "audio/aac"
-        }
-        return mimetypes.get(extension, "audio/wav")
+        return MIMETYPE_BY_EXT.get(extension, "audio/wav")
 
     def process_audio_file(self, file_path: Path) -> str:
         """

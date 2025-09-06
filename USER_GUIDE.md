@@ -108,6 +108,11 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 
 **`[processing]`**
 - **`reprocess`** (boolean, optional): When true, reprocess audio files even if output .txt already exists (overwrite). Default is false, which skips files with existing outputs.
+- **`soft_limit_files`** (integer, optional): Show confirmation prompt when attempting to process more files than this in batch mode. Default is 10.
+- **`hard_limit_files`** (integer, optional): Abort with error when attempting to process more files than this in batch mode. Default is 25.
+
+**`[ui]`**
+- **`selection_page_size`** (integer, optional): Number of files shown per page in interactive selection mode. Default is 10.
 
 #### Configuration Loading
 1. `config.toml` is loaded first (required)
@@ -121,6 +126,7 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 - Place audio files in a single folder (non-recursive scanning)
 - **Supported formats**: `.wav`, `.mp3`, `.m4a`, `.aac`
 - **Recommendation**: Use WAV format for best reliability
+- **Duration display**: Available for all formats (WAV always, AAC/MP3/M4A require mutagen package, fallback to ffprobe if available)
 - **Note**: Files are uploaded with the appropriate MIME type based on their format
 
 ### Run Meetscribe
@@ -130,6 +136,42 @@ meetscribe process dir <path_to_audio_folder>
 
 # Using source
 python -m app.cli process dir <path_to_audio_folder>
+```
+
+#### Interactive Single-File Selection
+For directories with many files, use interactive selection to choose a specific file:
+
+```bash
+# Interactive selection mode
+meetscribe process dir <path_to_audio_folder> --select
+python -m app.cli process dir <path_to_audio_folder> --select
+```
+
+**Controls:**
+- **↑/↓ arrows**: Navigate through files within current page
+- **←/→ arrows**: Navigate between pages (wraps around)
+- **Space**: Toggle selection of the highlighted file (supports multiple selections across pages)
+- **Enter**: Confirm selection (processes all selected files, or highlighted file if none selected)
+- **Esc or 'q'**: Cancel selection
+
+**Benefits:**
+- Preview file metadata (name, size, modification date, duration) before selecting
+- Select and process multiple files at once across multiple pages
+- Process only the files you need, avoiding unwanted processing
+- Clear visual feedback showing selected files and count
+- Pagination for large directories with configurable page size
+- Files automatically sorted by last modified time (newest first)
+- Lazy duration computation for better performance on large directories
+
+#### Additional Commands
+
+```bash
+# List audio files with metadata (filename, size, duration, etc.)
+meetscribe process list <path_to_audio_folder>
+
+# Process a single file directly
+meetscribe process file <path_to_audio_file>
+meetscribe process file <path_to_audio_file> --reprocess
 ```
 
 **Examples**:
