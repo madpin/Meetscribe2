@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 from app.core.config import load_config, deep_merge
 
+# Get the expanded home directory path for comparison
+HOME_DIR = os.path.expanduser("~")
+
 
 def test_deep_merge():
     """Test the deep_merge utility function"""
@@ -40,8 +43,8 @@ output_folder = "~/Documents/Meetscribe"
             os.chdir(tmpdir)
             config = load_config()
 
-            assert config["deepgram"]["api_key"] == "test_key"
-            assert config["paths"]["output_folder"] == "~/Documents/Meetscribe"
+            assert config.deepgram.api_key == "test_key"
+            assert str(config.paths.output_folder) == os.path.join(HOME_DIR, "Documents", "Meetscribe")
         finally:
             os.chdir(original_cwd)
 
@@ -72,9 +75,9 @@ api_key = "local_key"
             config = load_config()
 
             # Should have overridden values
-            assert config["deepgram"]["api_key"] == "local_key"
+            assert config.deepgram.api_key == "local_key"
             # Should preserve non-overridden values
-            assert config["paths"]["output_folder"] == "~/Documents/Meetscribe"
+            assert str(config.paths.output_folder) == os.path.join(HOME_DIR, "Documents", "Meetscribe")
         finally:
             os.chdir(original_cwd)
 
