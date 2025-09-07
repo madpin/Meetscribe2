@@ -6,7 +6,7 @@ to generate different types of meeting notes (Q, W, E) from transcription text.
 """
 
 from pathlib import Path
-from typing import Optional, Set, Dict
+from typing import Set, Dict
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from app.core.config_models import LLMConfig
