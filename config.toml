@@ -56,3 +56,29 @@ calendar_id = "primary"
 default_past_days = 3
 max_results = 50
 filter_group_events_only = true
+
+[llm]
+# LLM post-processing configuration
+enabled = true
+dialect = "openai"
+base_url = ""  # set to your LiteLLM proxy URL if used
+api_key = ""   # leave empty; set in config.local.toml
+model = "gpt-4o-mini"
+temperature = 0.2
+default_modes = ""  # Default is none. Set to "Q", "WE", or "QWE" to preselect modes.
+
+[llm.prompts]
+q = "Write a clear, concise executive summary of the meeting. Include key points, decisions, risks, and next steps."
+w = "Provide a holistic analysis of the meeting. Summarize themes, sentiments by participants, points of alignment or tension, and overall tone."
+e = "Extract a precise, actionable list of tasks discussed. For each, include assignee (if known), due date (if mentioned), and concise description."
+
+[llm.paths]
+# Optional overrides; defaults to main output_folder when empty
+q_output_folder = ""
+w_output_folder = ""
+e_output_folder = ""
+
+[llm.keys]
+q = "Q"
+w = "W"
+e = "E"

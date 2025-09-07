@@ -15,6 +15,7 @@ from rich.console import Console
 from app.core.context import AppContext
 from app.core.exceptions import ConfigurationError, TranscriptionError, GoogleCalendarError
 from app.services.file_processor import FileProcessor
+from app.services.llm_notes import LLMNotesGenerator
 from app.ui import interactive_select_files
 from app.transcriber import Transcriber
 from app.integrations.google_calendar import GoogleCalendarClient
@@ -61,23 +62,64 @@ def process_directory(
     reprocess: Optional[bool] = typer.Option(
         None,
         "--reprocess",
-        help="Reprocess files even if the output .txt already exists (overwrite).",
+        help="Reprocess files: regenerate LLM notes from existing transcriptions, or run full transcription if none exists.",
     ),
     select_file: bool = typer.Option(
         False,
         "--select",
-        help="Interactively choose multiple files with arrows/space/enter.",
+        help="Interactively choose multiple files with arrows/space/enter and Q/W/E mode toggling.",
+    ),
+    llm_enabled: Optional[bool] = typer.Option(
+        None,
+        "--llm/--no-llm",
+        help="Enable/disable LLM post-processing (defaults to config).",
+    ),
+    notes: Optional[str] = typer.Option(
+        None,
+        "--notes",
+        "-n",
+        help="LLM notes to generate: any combination of Q, W, E. Example: QWE or QW.",
     ),
 ):
     """
     Process all audio files in a directory and generate meeting notes.
-    Use --select for interactive multiple-file selection.
+
+    Use --select for interactive multiple-file selection with Q/W/E mode toggling.
+    Use --llm/--no-llm to enable/disable LLM post-processing.
+    Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
     """
     ctx = get_app_context()
 
     # Initialize services
     processor = FileProcessor(ctx.config, ctx.logger)
     transcriber = Transcriber(ctx.config.deepgram, ctx.logger)
+
+    # Resolve LLM configuration
+    effective_llm = llm_enabled if llm_enabled is not None else ctx.config.llm.enabled
+    selected_modes = None
+    if notes:
+        # Parse notes string and validate against config keys
+        parsed_modes = set(notes.upper())
+        valid_modes = set(ctx.config.llm.keys.model_dump().values())
+        selected_modes = parsed_modes.intersection(valid_modes)
+        if not selected_modes:
+            ctx.logger.error(f"No valid modes found in '{notes}'. Valid modes: {', '.join(sorted(valid_modes))}")
+            raise typer.Exit(code=1)
+    else:
+        # Use default modes from config
+        selected_modes = set(ctx.config.llm.default_modes.upper())
+
+    # Initialize LLM generator if enabled
+    llm_generator = None
+    if effective_llm:
+        try:
+            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger)
+            mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
+            ctx.logger.info(f"LLM post-processing enabled for modes: {mode_str}")
+        except Exception as e:
+            ctx.logger.error(f"Failed to initialize LLM generator: {e}")
+            ctx.logger.warning("Continuing without LLM post-processing")
+            effective_llm = False
 
     # Resolve input folder
     input_dir = processor.resolve_input_folder(audio_directory)
@@ -123,27 +165,64 @@ def process_directory(
 
     if use_select_mode:
         # Interactive selection mode
-        selected = interactive_select_files(
-            files, output_folder, ctx.config.ui.selection_page_size, ctx.logger
+        ctx.logger.debug(f"CLI selected_modes = {selected_modes}")
+        ctx.logger.debug(f"CLI note_keys = {ctx.config.llm.keys.model_dump()}")
+
+        # Build LLM output folder map for tri-state UI indicators
+        llm_output_map = {
+            "Q": ctx.config.llm.paths.q_output_folder,
+            "W": ctx.config.llm.paths.w_output_folder,
+            "E": ctx.config.llm.paths.e_output_folder,
+        }
+
+        result = interactive_select_files(
+            files, output_folder, ctx.config.ui.selection_page_size, ctx.logger,
+            note_keys=ctx.config.llm.keys.model_dump(), initial_modes=selected_modes,
+            llm_output_map=llm_output_map
         )
-        if selected is None:
+        if result is None:
             ctx.logger.info("Selection cancelled")
             return
 
+        selected_files, file_modes_dict = result
+
+        # Check if we have any files to process
+        if not selected_files:
+            ctx.logger.warning("No files selected for processing. Make sure to select files with Space or enable modes on the current file.")
+            return
+
+        # Debug logging
+        ctx.logger.debug(f"CLI processing {len(selected_files)} files")
+        for file in selected_files:
+            modes = file_modes_dict.get(file, set())
+            ctx.logger.debug(f"CLI {file.name} -> modes: {''.join(sorted(modes)) if modes else 'None'}")
+
         # Process selected files with reprocess=True (since user chose them)
+        # Pass per-file modes to the processor
         processed_count, skipped_count = processor.run_batch(
-            selected, True, transcriber, output_folder
+            selected_files, True, transcriber, output_folder, llm_generator, file_modes_dict
         )
 
-        ctx.logger.info(f"Selection summary: Processed={processed_count}, Skipped={skipped_count}, Total selected={len(selected)}")
+        # Calculate mode summary for logging
+        all_modes = set()
+        for file_path, modes in file_modes_dict.items():
+            ctx.logger.debug(f"CLI file {file_path.name} has modes: {modes}")
+            all_modes.update(modes)
+
+        mode_summary = ''.join(sorted(all_modes)) if all_modes else 'None'
+        ctx.logger.debug(f"CLI all modes across files: {all_modes}")
+        ctx.logger.debug(f"CLI mode summary: {mode_summary}")
+
+        ctx.logger.info(f"Selection summary: Processed={processed_count}, Skipped={skipped_count}, Total selected={len(selected_files)}, Active modes={mode_summary}")
     else:
         # Batch processing mode
         candidates = processor.get_files_to_process(files, effective_reprocess, output_folder)
         processed_count, skipped_count = processor.run_batch(
-            candidates, effective_reprocess, transcriber, output_folder
+            candidates, effective_reprocess, transcriber, output_folder, llm_generator, selected_modes
         )
 
-        ctx.logger.info(f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total candidates={len(candidates)}")
+        mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
+        ctx.logger.info(f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total candidates={len(candidates)}, Modes={mode_str}")
 
 
 @process_app.command("list")
@@ -206,11 +285,25 @@ def process_file(
     reprocess: Optional[bool] = typer.Option(
         None,
         "--reprocess",
-        help="Reprocess the file even if the output .txt already exists (overwrite).",
+        help="Reprocess files: regenerate LLM notes from existing transcriptions, or run full transcription if none exists.",
+    ),
+    llm_enabled: Optional[bool] = typer.Option(
+        None,
+        "--llm/--no-llm",
+        help="Enable/disable LLM post-processing (defaults to config).",
+    ),
+    notes: Optional[str] = typer.Option(
+        None,
+        "--notes",
+        "-n",
+        help="LLM notes to generate: any combination of Q, W, E. Example: QWE or QW.",
     ),
 ):
     """
     Process a single audio file and generate meeting notes.
+
+    Use --llm/--no-llm to enable/disable LLM post-processing.
+    Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
     """
     ctx = get_app_context()
     from app.transcriber import SUPPORTED_EXTENSIONS
@@ -222,6 +315,33 @@ def process_file(
     # Initialize services
     processor = FileProcessor(ctx.config, ctx.logger)
     transcriber = Transcriber(ctx.config.deepgram, ctx.logger)
+
+    # Resolve LLM configuration
+    effective_llm = llm_enabled if llm_enabled is not None else ctx.config.llm.enabled
+    selected_modes = None
+    if notes:
+        # Parse notes string and validate against config keys
+        parsed_modes = set(notes.upper())
+        valid_modes = set(ctx.config.llm.keys.model_dump().values())
+        selected_modes = parsed_modes.intersection(valid_modes)
+        if not selected_modes:
+            ctx.logger.error(f"No valid modes found in '{notes}'. Valid modes: {', '.join(sorted(valid_modes))}")
+            raise typer.Exit(code=1)
+    else:
+        # Use default modes from config
+        selected_modes = set(ctx.config.llm.default_modes.upper())
+
+    # Initialize LLM generator if enabled
+    llm_generator = None
+    if effective_llm:
+        try:
+            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger)
+            mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
+            ctx.logger.info(f"LLM post-processing enabled for modes: {mode_str}")
+        except Exception as e:
+            ctx.logger.error(f"Failed to initialize LLM generator: {e}")
+            ctx.logger.warning("Continuing without LLM post-processing")
+            effective_llm = False
 
     # Resolve input folder
     input_folder = processor.resolve_input_folder(None)
@@ -249,13 +369,14 @@ def process_file(
     try:
         # Process single file
         processed_count, skipped_count = processor.run_batch(
-            [audio_path], effective_reprocess, transcriber, output_folder
+            [audio_path], effective_reprocess, transcriber, output_folder, llm_generator, selected_modes
         )
 
         if skipped_count > 0:
-            ctx.logger.info(f"File was skipped (already exists)")
+            ctx.logger.info("File was skipped (already exists)")
         else:
-            ctx.logger.info(f"File processed successfully")
+            mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
+            ctx.logger.info(f"File processed successfully, Modes={mode_str}")
 
     except TranscriptionError as e:
         ctx.logger.error(f"Transcription failed: {e}")
@@ -319,7 +440,7 @@ def calendar_past(
             return
 
         # Create table
-        table = Table(title=f"Past Calendar Events")
+        table = Table(title="Past Calendar Events")
         table.add_column("Start (Local)", style="cyan", justify="left")
         table.add_column("Title", style="green")
         table.add_column("Attendees", style="yellow")

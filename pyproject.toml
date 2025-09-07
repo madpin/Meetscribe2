@@ -30,6 +30,8 @@ dependencies = [
     "google-api-python-client",
     "google-auth",
     "google-auth-oauthlib",
+    "langchain",
+    "langchain-openai",
 ]
 
 [project.optional-dependencies]

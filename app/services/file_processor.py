@@ -112,38 +112,172 @@ class FileProcessor:
             return None  # Caller should prompt user
         return False
 
-    def run_batch(self, files: List[Path], reprocess: bool, transcriber: Transcriber, output_folder: Path) -> Tuple[int, int]:
+    def run_batch(self, files: List[Path], reprocess: bool, transcriber: Transcriber, output_folder: Path, llm_generator=None, llm_modes=None) -> Tuple[int, int]:
         """
-        Process a batch of audio files.
+        Process a batch of audio files with optional LLM note generation.
 
         Args:
             files: List of files to process
             reprocess: Whether to reprocess existing files
             transcriber: Transcriber instance
             output_folder: Output folder path
+            llm_generator: Optional LLMNotesGenerator instance for generating Q/W/E notes
+            llm_modes: Optional modes configuration. Can be:
+                - set[str]: Global modes for all files (backward compatibility)
+                - dict[Path, set[str]]: Per-file modes for interactive selection
 
         Returns:
             Tuple of (processed_count, skipped_count)
         """
         processed = skipped = 0
+
+        # Debug logging for modes
+        if llm_modes:
+            if isinstance(llm_modes, dict):
+                self.logger.debug(f"Processing with per-file modes for {len(llm_modes)} files")
+            elif isinstance(llm_modes, set):
+                self.logger.debug(f"Processing with global modes: {''.join(sorted(llm_modes))}")
+
         for file in files:
             out = output_folder / f"{file.stem}.txt"
-            if not reprocess and out.exists():
-                self.logger.info(f"Skipping {file.name}: {out} already exists")
-                skipped += 1
+
+            # Debug logging for per-file modes
+            if llm_modes and isinstance(llm_modes, dict):
+                file_modes_debug = self._get_modes_for_file(file, llm_modes)
+                self.logger.debug(f"PROC {file.name} modes: {file_modes_debug}")
+
+            # Check if transcription already exists
+            transcription_exists = out.exists()
+
+            if transcription_exists and not reprocess:
+                # Smart processing: transcription exists and we're not reprocessing
+                if llm_generator and llm_modes:
+                    # Get modes for this specific file
+                    file_modes = self._get_modes_for_file(file, llm_modes)
+
+                    if file_modes:
+                        self.logger.info(f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})")
+
+                        try:
+                            existing_content = out.read_text()
+                            llm_generator.generate_for_modes(existing_content, file_modes, file.stem, output_folder, reprocess)
+                            processed += 1
+                        except Exception as e:
+                            self.logger.error(f"Failed to generate LLM notes from existing transcription for {file.name}: {e}")
+                            processed += 1  # Still count as processed even if LLM fails
+                    else:
+                        self.logger.info(f"Transcription exists for {file.name} but no LLM modes specified for this file, skipping")
+                        skipped += 1
+                else:
+                    # No LLM generator or modes at all
+                    self.logger.info(f"Transcription exists for {file.name} but no LLM setup, skipping")
+                    skipped += 1
+                continue
+            elif transcription_exists and reprocess:
+                # Reprocessing: read existing transcription and regenerate LLM notes only
+                self.logger.info(f"Reprocessing {file.name} using existing transcription, regenerating LLM notes")
+
+                try:
+                    # Read existing transcription
+                    existing_content = out.read_text()
+                    self.logger.info(f"Loaded existing transcription for {file.name} ({len(existing_content)} chars)")
+
+                    # Generate LLM notes if requested
+                    if llm_generator and llm_modes:
+                        file_modes = self._get_modes_for_file(file, llm_modes)
+                        if file_modes:
+                            llm_generator.generate_for_modes(existing_content, file_modes, file.stem, output_folder, reprocess)
+                            self.logger.info(f"LLM notes regenerated for {file.name}")
+                        else:
+                            self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                    else:
+                        self.logger.info(f"No LLM setup for {file.name}, skipping LLM generation")
+
+                    processed += 1
+
+                except Exception as e:
+                    self.logger.error(f"Failed to reprocess {file.name}: {e}")
+                    processed += 1  # Still count as processed even if it fails
+
                 continue
 
+            # Transcription doesn't exist, process the file normally
             try:
                 notes = transcriber.process_audio_file(file)
                 with open(out, "w") as fp:
                     fp.write(notes)
-                self.logger.info(f"Notes saved to {out}")
+                self.logger.info(f"Transcription completed and saved to {out}")
+
+                # Generate LLM notes if requested
+                if llm_generator and llm_modes:
+                    try:
+                        # Get modes for this specific file
+                        file_modes = self._get_modes_for_file(file, llm_modes)
+                        self.logger.debug(f"Generating LLM for {file.name} with modes: {file_modes}")
+                        if file_modes:
+                            llm_generator.generate_for_modes(notes, file_modes, file.stem, output_folder, reprocess)
+                            self.logger.info(f"LLM notes generated for {file.name}")
+                        else:
+                            self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                    except Exception as e:
+                        self.logger.error(f"Failed to generate LLM notes for {file.name}: {e}")
+
                 processed += 1
             except Exception as e:
                 self.logger.error(f"Failed to process {file}: {e}")
                 notes = f"Error: Could not process {file}."
                 with open(out, "w") as fp:
                     fp.write(notes)
+
+                # Even for errors, try to generate LLM notes if requested (from error message)
+                if llm_generator and llm_modes:
+                    try:
+                        # Get modes for this specific file
+                        file_modes = self._get_modes_for_file(file, llm_modes)
+                        if file_modes:
+                            llm_generator.generate_for_modes(notes, file_modes, file.stem, output_folder, reprocess)
+                    except Exception as llm_error:
+                        self.logger.error(f"Failed to generate LLM notes for error case {file.name}: {llm_error}")
+
                 processed += 1  # Still count as processed (error file created)
 
         return processed, skipped
+
+    def _get_modes_for_file(self, file: Path, llm_modes):
+        """
+        Get the modes for a specific file, handling both old and new formats.
+
+        Args:
+            file: The file path
+            llm_modes: Either a set[str] (global modes) or dict[Path, set[str]] (per-file modes)
+
+        Returns:
+            set[str]: The modes for this file
+        """
+        if llm_modes is None:
+            return set()
+
+        # Handle per-file modes (dict format)
+        if isinstance(llm_modes, dict):
+            # First try exact match
+            if file in llm_modes:
+                self.logger.debug(f"Found exact match for {file.name} with modes: {''.join(sorted(llm_modes[file]))}")
+                return llm_modes[file]
+
+            # Try to find by filename match (more robust)
+            file_name = file.name
+            for dict_file, modes in llm_modes.items():
+                if dict_file.name == file_name:
+                    self.logger.debug(f"Found filename match for {file_name} with modes: {''.join(sorted(modes))}")
+                    return modes
+
+            # If still not found, log the issue
+            self.logger.debug(f"No modes found for {file_name}. Available files: {[f.name for f in llm_modes.keys()]}")
+            return set()
+
+        # Handle global modes (set format) for backward compatibility
+        if isinstance(llm_modes, set):
+            return llm_modes
+
+        # Fallback
+        return set()

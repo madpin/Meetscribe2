@@ -43,11 +43,24 @@ pyinstaller --onefile --name meetscribe --add-data "config.toml:." app/cli.py
 
 The executable will be created in the `dist/` directory and can be distributed to any machine (Linux, macOS, or Windows) without requiring Python to be installed.
 
+## 🧠 Smart LLM Processing
+
+Meetscribe intelligently optimizes processing based on existing files:
+
+- **New audio files**: Full transcription + LLM note generation
+- **Existing transcriptions + LLM enabled**: Skip transcription, generate LLM notes from existing content
+- **Existing transcriptions + LLM enabled + `--reprocess`**: Read existing transcription, regenerate only LLM notes (fast!)
+- **Existing transcriptions + no LLM**: Skip file entirely
+- **With `--reprocess` on new files**: Force complete transcription + LLM generation
+
+This means you can efficiently experiment with different LLM note types on existing transcriptions without re-running expensive transcription processes!
+
 ## 🎯 What Works Now
 
 ### ✅ Working Features
 - **Audio Processing:** Converts audio recordings into structured meeting notes
 - **Batch Processing:** Process entire directories of audio files automatically
+- **LLM Post-Processing:** Generate AI-enhanced notes in three modes (Q=Executive Summary, W=Holistic Analysis, E=Actionable Tasks)
 - **CLI Interface:** Full command-line interface with audio processing commands
 - **Configuration System:** TOML-based configuration with local overrides
 - **Deepgram Integration:** AI-powered transcription and analysis
@@ -71,6 +84,25 @@ python -m app.cli process list /path/to/audio/files
 python -m app.cli process file /path/to/audio.wav
 python -m app.cli process file /path/to/audio.wav --reprocess
 
+# LLM Post-Processing Examples
+# Enable LLM and specify modes (no modes preselected by default)
+python -m app.cli process dir /path/to/audio/files --llm --notes QW
+
+# Enable LLM with all modes (Q=Executive Summary, W=Holistic Analysis, E=Actionable Tasks)
+python -m app.cli process dir /path/to/audio/files --llm --notes QWE
+
+# Interactive selection with tri-state mode indicators (✓ processed, o queued, - off)
+python -m app.cli process dir /path/to/audio/files --select
+
+# Process single file with LLM (E=Actionable Tasks only)
+python -m app.cli process file /path/to/audio.wav --llm --notes E
+
+# Generate LLM notes from existing transcriptions (skip expensive transcription)
+python -m app.cli process dir /path/to/audio/files --llm --notes QWE  # Uses existing .txt files
+
+# Force reprocessing of both transcription and LLM notes
+python -m app.cli process dir /path/to/audio/files --llm --reprocess
+
 # View available commands
 python -m app.cli --help
 ```
@@ -80,13 +112,18 @@ When using `--select`, navigate with:
 - **↑/↓ arrows**: Move selection highlight within current page
 - **←/→ arrows**: Navigate between pages (wraps around)
 - **Space**: Toggle selection of highlighted file (supports multiple selections across pages)
+- **Q/W/E keys**: Toggle LLM note generation modes for the current file (Q=Executive Summary, W=Holistic Analysis, E=Actionable Tasks)
 - **Enter**: Confirm selection (processes all selected files, or highlighted file if none selected)
-- **Esc or 'q'**: Cancel selection
+- **Esc**: Cancel selection
 
 The interface shows page information and includes:
-- **Pagination**: Shows "Page X/Y — Showing A-B of N" in the title
+- **Pagination**: Shows "Page X/Y — Showing A-B of N — ✓ processed, o queued, - off" in the title
 - **Page size**: Configurable via `[ui].selection_page_size` (default: 10)
 - **Done status**: ✓ indicates files that have already been processed (output .txt exists)
+- **Mode status**: Tri-state indicators for each LLM mode:
+  - **✓**: Mode file already exists (previously processed)
+  - **o**: Mode is queued for processing (selected but not yet processed)
+  - **-**: Mode is not selected
 - **Relative timestamps**: Modified dates show both absolute time and relative age (e.g., "2024-01-15 14:30 (2h)")
 - **Newest first**: Files are automatically sorted by last modified time
 - **Lazy loading**: Duration is computed only for visible page items for better performance

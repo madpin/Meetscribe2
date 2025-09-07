@@ -9,6 +9,7 @@ Meetscribe is a tool that automatically converts audio recordings of meetings in
 ## ✨ Features
 
 - **🤖 Automated Transcription and Summarization:** Turn raw audio into polished notes without lifting a finger. The tool intelligently processes recordings to create a full transcript, a high-level **summary**, a list of **key decisions**, clear **action items**, and a **speaker timeline** with diarization.
+- **🧠 LLM Post-Processing Notes:** Generate three types of AI-enhanced meeting notes (Q=Executive Summary, W=Holistic Analysis, E=Actionable Tasks) using LangChain and OpenAI-compatible APIs. Toggle modes interactively or specify via CLI.
 - **📁 Effortless Batch Processing:** Simply point the tool to a folder of your meeting recordings. It automatically finds and processes all supported audio files in one go, saving you the tedious task of handling them one by one.
 - **🎯 Interactive Single-File Selection:** Use arrow keys and space bar to interactively choose which file to process from a directory, with live preview of file metadata including size, duration, done status, and relative timestamps. Supports pagination with left/right arrows and configurable page sizes.
 - **🖥️ Simple Command-Line Operation:** Designed for efficiency, Meetscribe operates through a clean and simple command-line interface. It provides a fast, scriptable way to manage your meeting notes directly from the terminal.
@@ -32,7 +33,74 @@ app/
 │   ├── config.py       # TOML configuration loading
 │   └── exceptions.py   # Custom exception classes
 ├── transcriber.py     # Deepgram transcription and analysis
+├── services/
+│   ├── llm_notes.py   # LLM-powered note generation (Q/W/E modes)
+│   └── agents.py      # Future agent-based implementations
 └── cli.py             # Typer-based command-line interface
+```
+
+## 🧠 LLM Post-Processing
+
+Meetscribe supports AI-powered post-processing of meeting transcripts to generate three types of structured notes:
+
+- **Q (Executive Summary)**: Clear, concise overview with key points, decisions, risks, and next steps
+- **W (Holistic Analysis)**: Comprehensive analysis of themes, participant sentiments, alignment/tension points, and overall tone
+- **E (Actionable Tasks)**: Precise list of tasks with assignees, due dates, and descriptions
+
+### Configuration
+
+Add LLM settings to your `config.toml`:
+
+```toml
+[llm]
+enabled = true
+dialect = "openai"
+base_url = ""  # Your LiteLLM proxy URL (optional)
+api_key = ""   # Set in config.local.toml (never commit!)
+model = "gpt-4o-mini"
+temperature = 0.2
+default_modes = ""  # Default is none. Set to "Q", "WE", or "QWE" to preselect modes.
+
+[llm.prompts]
+q = "Write a clear, concise executive summary..."
+w = "Provide a holistic analysis of the meeting..."
+e = "Extract a precise, actionable list of tasks..."
+
+[llm.paths]
+q_output_folder = ""  # Empty/unset = use main output folder
+w_output_folder = ""
+e_output_folder = ""
+
+[llm.keys]
+q = "Q"
+w = "W"
+e = "E"
+```
+
+### Usage Examples
+
+```bash
+# Enable LLM and specify modes (no modes preselected by default)
+python -m app.cli process dir /path/to/audio --llm --notes QW
+
+# Enable LLM with all modes
+python -m app.cli process dir /path/to/audio --llm --notes QWE
+
+# Interactive mode with tri-state mode indicators (✓ processed, o queued, - off)
+python -m app.cli process dir /path/to/audio --select
+
+# Process single file with specific modes
+python -m app.cli process file meeting.wav --llm --notes E
+
+# Generate LLM notes from existing transcriptions (skip transcription)
+python -m app.cli process dir /path/to/audio --llm --notes QWE  # Uses existing .txt files
+
+# Regenerate LLM notes from existing transcriptions (skip audio transcription)
+python -m app.cli process dir /path/to/audio --llm --reprocess
+
+# Force complete reprocessing including audio transcription
+# (if you want to re-run transcription + regenerate LLM notes)
+python -m app.cli process dir /path/to/audio --llm --reprocess  # Uses existing .txt files when available
 ```
 
 ## 🚀 Quick Usage

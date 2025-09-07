@@ -6,6 +6,7 @@
 - [Installation and Setup](#installation-and-setup)
 - [Configuration](#configuration)
 - [Usage](#usage)
+- [LLM Post-Processing](#llm-post-processing)
 - [Output and Results](#output-and-results)
 - [Troubleshooting](#troubleshooting)
 - [Privacy and Security](#privacy-and-security)
@@ -48,7 +49,7 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 
 2. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 3. Verify installation:
@@ -226,7 +227,7 @@ python -m app.cli process dir <path_to_audio_folder>
 For directories with many files, use interactive selection to choose a specific file:
 
 ```bash
-# Interactive selection mode
+# Interactive selection mode with tri-state indicators
 meetscribe process dir <path_to_audio_folder> --select
 python -m app.cli process dir <path_to_audio_folder> --select
 ```
@@ -236,7 +237,7 @@ python -m app.cli process dir <path_to_audio_folder> --select
 - **←/→ arrows**: Navigate between pages (wraps around)
 - **Space**: Toggle selection of the highlighted file (supports multiple selections across pages)
 - **Enter**: Confirm selection (processes all selected files, or highlighted file if none selected)
-- **Esc or 'q'**: Cancel selection
+- **Esc**: Cancel selection
 
 **Benefits:**
 - Preview file metadata (name, size, modification date, duration) before selecting
@@ -284,6 +285,102 @@ meetscribe process dir <path_to_audio_folder> --reprocess
 2. Uploads each file to Deepgram for transcription and analysis
 3. Saves structured notes as `.txt` files in your output folder
 4. Uses the same base filename as the audio file
+
+## LLM Post-Processing
+
+Meetscribe can enhance your meeting notes with AI-powered post-processing that generates three types of structured notes from the transcription:
+
+### Note Types
+
+- **Q (Executive Summary)**: A clear, concise overview including key points, decisions made, risks identified, and next steps
+- **W (Holistic Analysis)**: A comprehensive analysis covering themes, participant sentiments, points of alignment or tension, and overall meeting tone
+- **E (Actionable Tasks)**: A precise, actionable list of tasks discussed, including assignees (when mentioned), due dates, and descriptions
+
+### Configuration
+
+Add LLM settings to your `config.toml`:
+
+```toml
+[llm]
+enabled = true
+dialect = "openai"
+base_url = ""  # Your LiteLLM proxy URL if using one
+api_key = ""   # Set this in config.local.toml (never commit!)
+model = "gpt-4o-mini"
+temperature = 0.2
+default_modes = ""  # Default is none. Set to "Q", "WE", or "QWE" to preselect modes.
+```
+
+### Usage
+
+#### Command Line Options
+
+```bash
+# Enable LLM and specify modes (no modes preselected by default)
+meetscribe process dir /path/to/audio --llm --notes QW
+
+# Enable LLM with all modes
+meetscribe process dir /path/to/audio --llm --notes QWE
+
+# Disable LLM
+meetscribe process dir /path/to/audio --no-llm
+
+# Process single file with LLM
+meetscribe process file meeting.wav --llm --notes E
+
+# Generate LLM notes from existing transcriptions (skip expensive transcription)
+meetscribe process dir /path/to/audio --llm --notes QWE  # Uses existing .txt files
+
+# Force reprocessing of both transcription and LLM notes
+meetscribe process dir /path/to/audio --llm --reprocess
+```
+
+#### Interactive Mode
+
+When using `--select` for interactive file selection, you can also toggle note modes:
+
+```bash
+meetscribe process dir /path/to/audio --select
+```
+
+In interactive mode:
+- Use arrow keys to navigate files
+- Press **Space** to select/deselect files
+- Press **Q**, **W**, or **E** to toggle the corresponding note mode
+- Press **Enter** to confirm and process
+- The title bar shows "✓ processed, o queued, - off" indicating tri-state mode status:
+  - **✓**: Mode file already exists (previously processed)
+  - **o**: Mode is queued for processing (selected but not yet processed)
+  - **-**: Mode is not selected
+
+### Output Files
+
+LLM-generated notes are saved alongside the main transcription:
+- Main notes: `meeting1.txt`
+- Executive summary: `meeting1.Q.txt`
+- Holistic analysis: `meeting1.W.txt`
+- Actionable tasks: `meeting1.E.txt`
+
+### Smart Processing Behavior
+
+Meetscribe automatically optimizes processing based on what files already exist:
+
+- **No transcription exists**: Runs full transcription + LLM generation
+- **Transcription exists + LLM modes specified + no `--reprocess`**: Skips transcription, generates LLM notes from existing content
+- **Transcription exists + LLM modes specified + `--reprocess`**: Reads existing transcription, regenerates LLM notes only (skips audio transcription)
+- **Transcription exists + no LLM modes**: Skips file entirely
+- **Use `--reprocess` on files without transcription**: Runs full transcription + LLM generation
+
+This means you can efficiently generate different types of LLM notes from existing transcriptions without re-running expensive transcription processes.
+
+### Security Note
+
+**Never commit API keys to version control.** Always set your LLM API key in `config.local.toml`:
+
+```toml
+[llm]
+api_key = "your-api-key-here"
+```
 
 ## Output and Results
 

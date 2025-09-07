@@ -79,6 +79,71 @@ class GoogleConfig(BaseModel):
         return self
 
 
+class LLMPathsConfig(BaseModel):
+    """LLM output folder configuration."""
+    q_output_folder: Optional[Path] = None
+    w_output_folder: Optional[Path] = None
+    e_output_folder: Optional[Path] = None
+
+    def expand(self, default_output: Path) -> "LLMPathsConfig":
+        """Expand user paths to absolute paths, using default_output if not set."""
+        def normalize_path(path: Optional[Path]) -> Optional[Path]:
+            """Normalize path value, treating empty/whitespace strings and '.' as unset."""
+            if path is None:
+                return None
+            # Convert to string and check if it's empty or whitespace-only
+            path_str = str(path).strip()
+            if not path_str or path_str == ".":
+                return None
+            return path
+
+        def resolve_path(path: Optional[Path], default: Path) -> Path:
+            """Resolve a path, using default if None."""
+            if path is None:
+                return default
+            return path.expanduser()
+
+        # Normalize each path value
+        self.q_output_folder = normalize_path(self.q_output_folder)
+        self.w_output_folder = normalize_path(self.w_output_folder)
+        self.e_output_folder = normalize_path(self.e_output_folder)
+
+        # Resolve to default_output if None, otherwise expanduser
+        self.q_output_folder = resolve_path(self.q_output_folder, default_output)
+        self.w_output_folder = resolve_path(self.w_output_folder, default_output)
+        self.e_output_folder = resolve_path(self.e_output_folder, default_output)
+
+        return self
+
+
+class LLMPromptsConfig(BaseModel):
+    """LLM prompt configuration."""
+    q: str = "Write a clear, concise executive summary of the meeting. Include key points, decisions, risks, and next steps."
+    w: str = "Provide a holistic analysis of the meeting. Summarize themes, sentiments by participants, points of alignment or tension, and overall tone."
+    e: str = "Extract a precise, actionable list of tasks discussed. For each, include assignee (if known), due date (if mentioned), and concise description."
+
+
+class LLMKeysConfig(BaseModel):
+    """LLM mode key mappings."""
+    q: str = "Q"
+    w: str = "W"
+    e: str = "E"
+
+
+class LLMConfig(BaseModel):
+    """LLM post-processing configuration."""
+    enabled: bool = True
+    dialect: str = "openai"
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: str = "gpt-4o-mini"
+    temperature: float = 0.2
+    default_modes: str = ""
+    prompts: LLMPromptsConfig = LLMPromptsConfig()
+    paths: LLMPathsConfig = LLMPathsConfig()
+    keys: LLMKeysConfig = LLMKeysConfig()
+
+
 class AppConfig(BaseModel):
     """Root configuration model."""
     deepgram: DeepgramConfig
@@ -87,3 +152,4 @@ class AppConfig(BaseModel):
     ui: UIConfig = UIConfig()
     logging: LoggingConfig = LoggingConfig()
     google: GoogleConfig = GoogleConfig()
+    llm: LLMConfig = LLMConfig()
