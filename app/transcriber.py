@@ -155,12 +155,19 @@ class Transcriber:
 
 ## Speaker Timeline
 {speaker_timeline}
+"""
 
+            # Only include Full Transcript section if diarization is disabled
+            # When diarization is enabled, the speaker timeline already provides
+            # the transcript content organized by speakers
+            if not self.cfg.diarize:
+                formatted_output += f"""
 ---
 
 ## Full Transcript
 {transcript}
 """
+
             return formatted_output.strip()
 
         except Exception as e:
