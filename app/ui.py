@@ -13,6 +13,9 @@ from rich.console import Console
 from rich.live import Live
 from rich.table import Table
 
+from app.integrations.google_calendar import GoogleCalendarClient
+from app.core.utils import truncate_attendees, truncate_attachments
+
 
 def interactive_select_files(
     files: List[Path],
@@ -258,3 +261,202 @@ def interactive_select_files(
                         if current_file in metadata_cache:
                             metadata_cache[current_file]['modes'][mode] = mode in file_modes[current_file]
                         break
+
+
+def interactive_select_events(events: list[dict], page_size: int, logger, reload_callback=None, start_date=None, end_date=None) -> Optional[tuple[list[dict], dict]]:
+    """
+    Interactive event selection with arrow keys and space bar.
+
+    Similar to interactive_select_files but for Google Calendar events.
+    Displays events in a table format with pagination support.
+    Supports date range navigation with 'P' key for previous day.
+
+    Args:
+        events: List of event dictionaries from Google Calendar API
+        page_size: Number of events to show per page
+        logger: Logger instance
+        reload_callback: Optional callback function to reload events for different date range.
+                        Should accept (start_date, end_date) and return (events, new_start, new_end)
+        start_date: Current start date for the range
+        end_date: Current end date for the range
+
+    Returns:
+        Tuple of (selected_events, date_info), or None if cancelled.
+        selected_events: List of selected events
+        date_info: Dict with 'start_date', 'end_date', 'navigated' (True if user used navigation)
+        Supports single event selection (current) or multiple selection with space bar.
+    """
+    if not events:
+        return None
+
+    from rich.console import Console
+    from rich.live import Live
+    from rich.table import Table
+    from math import ceil
+
+    console = Console()
+
+    # Navigation state
+    navigated = False
+    current_start_date = start_date
+    current_end_date = end_date
+
+    # Pagination state
+    current_page = 0
+    total_pages = ceil(len(events) / page_size)
+    current_index = 0  # Index within current page
+
+    # Track selected events by index in original list
+    selected_indices = set()
+
+    # Cache for event info to avoid recomputing
+    event_cache = {}
+
+    def get_event_info(event: dict):
+        """Get cached event info, computing metadata lazily."""
+        event_id = id(event)
+        if event_id not in event_cache:
+            start_str = GoogleCalendarClient.parse_event_start_local(event)
+            title = event.get('summary', '-')
+            attendees = GoogleCalendarClient.extract_attendee_names(event)
+            attendees_str = truncate_attendees(attendees)
+            attachments = GoogleCalendarClient.extract_attachment_titles(event)
+            attachments_str = truncate_attachments(attachments)
+
+            event_cache[event_id] = {
+                'start_str': start_str,
+                'title': title,
+                'attendees_str': attendees_str,
+                'attachments_str': attachments_str
+            }
+
+        return event_cache[event_id]
+
+    def get_current_page_events():
+        """Get events for current page."""
+        start_idx = current_page * page_size
+        end_idx = min(start_idx + page_size, len(events))
+        return events[start_idx:end_idx]
+
+    with Live(console=console, refresh_per_second=10, auto_refresh=False) as live:
+        while True:
+            # Get current page events and build info
+            current_page_events = get_current_page_events()
+            event_infos = [get_event_info(event) for event in current_page_events]
+
+            # Create table
+            selected_count = len(selected_indices)
+            start_idx = current_page * page_size
+            end_idx = min(start_idx + page_size, len(events))
+
+            # Build title with date range info if available
+            date_info = ""
+            if current_start_date and current_end_date:
+                start_str = current_start_date.strftime("%Y-%m-%d")
+                end_str = current_end_date.strftime("%Y-%m-%d")
+                date_info = f" ({start_str} to {end_str})"
+
+            nav_info = "P previous day, " if reload_callback else ""
+            title = f"Page {current_page + 1}/{total_pages} — Showing {start_idx + 1}-{end_idx} of {len(events)}{date_info} — ↑↓/Space select, ←→ pages, {nav_info}Enter confirm, Esc cancel ({selected_count} selected)"
+            table = Table(title=title, title_style="bold blue")
+            table.add_column("Sel", style="red", justify="center", width=3)
+            table.add_column("Start (Local)", style="cyan")
+            table.add_column("Title", style="green")
+            table.add_column("Attendees", style="yellow")
+            table.add_column("Attachments", style="magenta")
+
+            # Add rows for current page
+            for i, info in enumerate(event_infos):
+                global_index = start_idx + i
+                sel_marker = "*" if global_index in selected_indices else ""
+                style = "black on cyan" if i == current_index else None
+                table.add_row(sel_marker, info['start_str'], info['title'], info['attendees_str'], info['attachments_str'], style=style)
+
+            live.update(table)
+            live.refresh()
+
+            # Get key press
+            try:
+                from readchar import readkey, key as rkey
+                k = readkey()
+            except ImportError:
+                console.print("[red]readchar not installed. Install with: pip install readchar[/red]")
+                return None
+
+            # Handle keys
+            if k == rkey.UP:
+                current_index = (current_index - 1) % len(current_page_events)
+            elif k == rkey.DOWN:
+                current_index = (current_index + 1) % len(current_page_events)
+            elif k == rkey.LEFT:
+                # Previous page
+                current_page = (current_page - 1) % total_pages
+                current_index = 0
+            elif k == rkey.RIGHT:
+                # Next page
+                current_page = (current_page + 1) % total_pages
+                current_index = 0
+            elif k.upper() == 'P' and reload_callback and current_start_date:
+                # Previous day navigation
+                from datetime import timedelta
+                new_start_date = current_start_date - timedelta(days=1)
+                new_end_date = current_end_date - timedelta(days=1) if current_end_date else new_start_date + timedelta(days=1)
+
+                logger.info(f"Loading previous day: {new_start_date.strftime('%Y-%m-%d')} to {new_end_date.strftime('%Y-%m-%d')}")
+
+                # Call the reload callback
+                try:
+                    new_events, actual_start, actual_end = reload_callback(new_start_date, new_end_date)
+
+                    if new_events:
+                        # Update state with new events
+                        events[:] = new_events  # Replace the events list
+                        current_start_date = actual_start
+                        current_end_date = actual_end
+                        navigated = True
+
+                        # Reset pagination and selection
+                        current_page = 0
+                        current_index = 0
+                        selected_indices.clear()
+                        total_pages = ceil(len(events) / page_size)
+                        event_cache.clear()  # Clear cache for new events
+
+                        logger.info(f"Loaded {len(new_events)} events for previous day")
+                    else:
+                        logger.info("No events found for previous day")
+                except Exception as e:
+                    logger.error(f"Failed to load previous day events: {e}")
+
+                # Refresh the display
+                continue
+            elif k == rkey.SPACE:
+                # Toggle selection for current event
+                global_index = start_idx + current_index
+                if global_index in selected_indices:
+                    selected_indices.remove(global_index)
+                else:
+                    selected_indices.add(global_index)
+            elif k in (rkey.ENTER, rkey.CR):
+                # Return selected events with date info
+                if selected_indices:
+                    selected_events = [events[i] for i in selected_indices]
+                    logger.debug(f"UI selected {len(selected_events)} events")
+                    date_info = {
+                        'start_date': current_start_date,
+                        'end_date': current_end_date,
+                        'navigated': navigated
+                    }
+                    return selected_events, date_info
+                else:
+                    # No events explicitly selected - return the highlighted event
+                    current_event = current_page_events[current_index]
+                    logger.debug(f"UI current event: {current_event.get('summary', 'Unknown')}")
+                    date_info = {
+                        'start_date': current_start_date,
+                        'end_date': current_end_date,
+                        'navigated': navigated
+                    }
+                    return [current_event], date_info
+            elif k in (rkey.ESC,):
+                return None

@@ -14,10 +14,12 @@ from rich.console import Console
 
 from app.core.context import AppContext
 from app.core.exceptions import ConfigurationError, TranscriptionError, GoogleCalendarError
+from app.core.utils import truncate_attendees, truncate_attachments
 from app.services.file_processor import FileProcessor
 from app.services.llm_notes import LLMNotesGenerator
 from app.services.calendar_linker import CalendarLinker
-from app.ui import interactive_select_files
+from app.services.meeting_notes import EventNotesGenerator
+from app.ui import interactive_select_files, interactive_select_events
 from app.transcriber import Transcriber
 from app.integrations.google_calendar import GoogleCalendarClient
 
@@ -453,26 +455,6 @@ def _truncate_description(description: str, max_length: int = 80) -> str:
     return description[:max_length - 3] + "…"
 
 
-def _truncate_attendees(attendees: list, max_count: int = 5) -> str:
-    """Truncate attendee list to max_count with summary if needed."""
-    if not attendees:
-        return "-"
-    if len(attendees) <= max_count:
-        return ", ".join(attendees)
-    remaining = len(attendees) - max_count
-    return f"{', '.join(attendees[:max_count])} +{remaining} more"
-
-
-def _truncate_attachments(attachments: list, max_count: int = 3) -> str:
-    """Truncate attachment list to max_count with summary if needed."""
-    if not attachments:
-        return "-"
-    if len(attachments) <= max_count:
-        return ", ".join(attachments)
-    remaining = len(attachments) - max_count
-    return f"{', '.join(attachments[:max_count])} +{remaining} more"
-
-
 @calendar_app.command("past")
 def calendar_past(
     days: Optional[int] = typer.Option(None, "--days", "-d", help="Number of past days to list (defaults to config)."),
@@ -515,10 +497,10 @@ def calendar_past(
             start_str = GoogleCalendarClient.parse_event_start_local(event)
             title = event.get('summary', '-')
             attendees = GoogleCalendarClient.extract_attendee_names(event)
-            attendees_str = _truncate_attendees(attendees)
+            attendees_str = truncate_attendees(attendees)
             description = _truncate_description(event.get('description', '-'))
             attachments = GoogleCalendarClient.extract_attachment_titles(event)
-            attachments_str = _truncate_attachments(attachments)
+            attachments_str = truncate_attachments(attachments)
 
             table.add_row(start_str, title, attendees_str, description, attachments_str)
 
@@ -526,6 +508,157 @@ def calendar_past(
 
     except GoogleCalendarError as e:
         ctx.logger.error(f"Failed to list calendar events: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@calendar_app.command("upcoming")
+def calendar_upcoming(
+    days: Optional[int] = typer.Option(None, "--days", "-d", help="Number of days to look ahead (defaults to config)."),
+    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="Max number of events (defaults to config)."),
+    calendar_id: Optional[str] = typer.Option(None, "--calendar-id", help="Calendar ID (defaults to config)."),
+    group_only: Optional[bool] = typer.Option(None, "--group-only/--no-group-only", help="Only show events with 2 or more attendees (defaults to config)."),
+    select: bool = typer.Option(False, "--select", help="Interactively select events and create meeting notes."),
+):
+    """
+    List upcoming Google Calendar events and optionally create meeting notes.
+
+    Use --select to interactively choose events and generate Obsidian-ready meeting notes.
+    """
+    ctx = get_app_context()
+    console = Console()
+
+    ctx.logger.info(f"Listing upcoming calendar events with parameters: days={days}, limit={limit}, calendar_id={calendar_id}, group_only={group_only}, select={select}")
+
+    try:
+        # Initialize Google Calendar client
+        client = GoogleCalendarClient(ctx.config.google, ctx.logger)
+        events = client.list_upcoming_events(
+            days=days,
+            limit=limit,
+            calendar_id=calendar_id,
+            filter_group_events=group_only
+        )
+
+        if not events:
+            console.print("[yellow]No upcoming events found for the specified time range.[/yellow]")
+            return
+
+        if not select:
+            # Display table
+            table = Table(title="Upcoming Calendar Events")
+            table.add_column("Start (Local)", style="cyan", justify="left")
+            table.add_column("Title", style="green")
+            table.add_column("Attendees", style="yellow")
+            table.add_column("Description", style="blue")
+            table.add_column("Attachments", style="magenta")
+
+            # Add rows
+            for event in events:
+                start_str = GoogleCalendarClient.parse_event_start_local(event)
+                title = event.get('summary', '-')
+                attendees = GoogleCalendarClient.extract_attendee_names(event)
+                attendees_str = truncate_attendees(attendees)
+                description = _truncate_description(event.get('description', '-'))
+                attachments = GoogleCalendarClient.extract_attachment_titles(event)
+                attachments_str = truncate_attachments(attachments)
+
+                table.add_row(start_str, title, attendees_str, description, attachments_str)
+
+            console.print(table)
+        else:
+            # Interactive selection mode
+            from datetime import datetime, timedelta
+
+            # Calculate initial date range (today to future)
+            now = datetime.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            days_ahead = days if days is not None else ctx.config.google.default_past_days
+            end_date = today_start + timedelta(days=days_ahead)
+
+            # Create reload callback for date navigation
+            def reload_events(start_date, end_date):
+                try:
+                    new_events = client.list_events_in_range(
+                        start_date=start_date,
+                        end_date=end_date,
+                        calendar_id=calendar_id,
+                        filter_group_events=group_only
+                    )
+                    return new_events, start_date, end_date
+                except Exception as e:
+                    ctx.logger.error(f"Failed to reload events: {e}")
+                    return [], start_date, end_date
+
+            # Interactive selection with navigation
+            result = interactive_select_events(
+                events,
+                ctx.config.ui.selection_page_size,
+                ctx.logger,
+                reload_callback=reload_events,
+                start_date=today_start,
+                end_date=end_date
+            )
+
+            if result is None:
+                ctx.logger.info("Event selection cancelled")
+                console.print("[yellow]Selection cancelled.[/yellow]")
+                return
+
+            selected_events, date_info = result
+
+            if not selected_events:
+                ctx.logger.warning("No events selected")
+                console.print("[yellow]No events selected.[/yellow]")
+                return
+
+            # Log navigation if used
+            if date_info.get('navigated', False):
+                start_str = date_info['start_date'].strftime('%Y-%m-%d') if date_info['start_date'] else 'Unknown'
+                end_str = date_info['end_date'].strftime('%Y-%m-%d') if date_info['end_date'] else 'Unknown'
+                ctx.logger.info(f"User navigated to date range: {start_str} to {end_str}")
+
+            # Check if meeting notes are enabled
+            if not ctx.config.meeting_notes.enabled:
+                ctx.logger.warning("Meeting notes generation is disabled in configuration")
+                console.print("[yellow]Meeting notes generation is disabled. Enable it in config to create notes.[/yellow]")
+                return
+
+            # Initialize notes generator
+            try:
+                notes_generator = EventNotesGenerator(ctx.config.meeting_notes, ctx.logger)
+            except Exception as e:
+                ctx.logger.error(f"Failed to initialize meeting notes generator: {e}")
+                console.print(f"[red]Failed to initialize meeting notes generator: {e}[/red]")
+                raise typer.Exit(code=1)
+
+            # Create notes for selected events
+            created_paths = []
+            for event in selected_events:
+                try:
+                    note_path = notes_generator.create_note_for_event(event)
+                    created_paths.append(note_path)
+                    console.print(f"[green]✓ Created note:[/green] {note_path}")
+                except Exception as e:
+                    event_title = event.get('summary', 'Unknown Event')
+                    ctx.logger.error(f"Failed to create note for event '{event_title}': {e}")
+                    console.print(f"[red]✗ Failed to create note for '{event_title}': {e}[/red]")
+
+            # Summary
+            success_count = len(created_paths)
+            total_count = len(selected_events)
+            folder_path = ctx.config.meeting_notes.output_folder
+
+            if success_count > 0:
+                console.print(f"\n[bold green]Summary:[/bold green] Created {success_count}/{total_count} meeting notes")
+                console.print(f"[blue]Output folder:[/blue] {folder_path}")
+                if success_count < total_count:
+                    console.print(f"[yellow]Note: {total_count - success_count} events failed[/yellow]")
+            else:
+                console.print(f"\n[red]Failed to create any meeting notes[/red]")
+
+    except GoogleCalendarError as e:
+        ctx.logger.error(f"Failed to list upcoming calendar events: {e}")
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1)
 

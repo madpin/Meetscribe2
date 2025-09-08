@@ -293,3 +293,41 @@ def generate_unique_path(base: Path, stem: str, ext: str) -> Path:
         if not candidate.exists():
             return candidate
         counter += 1
+
+
+def truncate_attendees(attendees: list, max_count: int = 5) -> str:
+    """
+    Truncate attendee list to max_count with summary if needed.
+
+    Args:
+        attendees: List of attendee names
+        max_count: Maximum number of attendees to show before truncating
+
+    Returns:
+        Formatted attendee string
+    """
+    if not attendees:
+        return "-"
+    if len(attendees) <= max_count:
+        return ", ".join(attendees)
+    remaining = len(attendees) - max_count
+    return f"{', '.join(attendees[:max_count])} +{remaining} more"
+
+
+def truncate_attachments(attachments: list, max_count: int = 3) -> str:
+    """
+    Truncate attachment list to max_count with summary if needed.
+
+    Args:
+        attachments: List of attachment titles
+        max_count: Maximum number of attachments to show before truncating
+
+    Returns:
+        Formatted attachment string
+    """
+    if not attachments:
+        return "-"
+    if len(attachments) <= max_count:
+        return ", ".join(attachments)
+    remaining = len(attachments) - max_count
+    return f"{', '.join(attachments[:max_count])} +{remaining} more"

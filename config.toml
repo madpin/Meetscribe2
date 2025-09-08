@@ -85,3 +85,12 @@ e_output_folder = ""
 q = "Q"
 w = "W"
 e = "E"
+
+[meeting_notes]
+# Meeting notes generation configuration
+enabled = true
+template_file = "~/.meetscribe/templates/meeting_note.md"
+output_folder = "~/Documents/Meetscribe/Meetings"
+output_extension = "md"
+filename_format = "{date}_{title}"
+date_format = "%Y-%m-%d"

@@ -72,4 +72,5 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     cfg.logging = cfg.logging.expand()
     cfg.google = cfg.google.expand()
     cfg.llm.paths = cfg.llm.paths.expand(cfg.paths.output_folder)
+    cfg.meeting_notes = cfg.meeting_notes.expand()
     return cfg

@@ -134,6 +134,24 @@ class LLMKeysConfig(BaseModel):
     e: str = "E"
 
 
+class MeetingNotesConfig(BaseModel):
+    """Meeting notes configuration."""
+    enabled: bool = True
+    template_file: Path = Path("~/.meetscribe/templates/meeting_note.md")
+    output_folder: Path = Path("~/Documents/Meetscribe/Meetings")
+    output_extension: str = "md"
+    filename_format: str = "{date}_{title}"
+    date_format: str = "%Y-%m-%d"
+
+    def expand(self):
+        """Expand user paths to absolute paths."""
+        self.template_file = self.template_file.expanduser()
+        self.output_folder = self.output_folder.expanduser()
+        # Normalize output extension: remove leading dot, lowercase, default to md
+        self.output_extension = (self.output_extension or "md").strip().lstrip('.').lower() or "md"
+        return self
+
+
 class LLMConfig(BaseModel):
     """LLM post-processing configuration."""
     enabled: bool = True
@@ -157,3 +175,4 @@ class AppConfig(BaseModel):
     logging: LoggingConfig = LoggingConfig()
     google: GoogleConfig = GoogleConfig()
     llm: LLMConfig = LLMConfig()
+    meeting_notes: MeetingNotesConfig = MeetingNotesConfig()
