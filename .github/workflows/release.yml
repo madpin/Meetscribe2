@@ -36,6 +36,7 @@ jobs:
 
     - name: Check template status
       id: template_check
+      shell: bash
       run: |
         if grep -q "{{.*}}" pyproject.toml; then
           echo "is_template=true" >> $GITHUB_OUTPUT
@@ -60,6 +61,7 @@ jobs:
 
     - name: Set up code signing (macOS)
       if: steps.template_check.outputs.is_template == 'false' && matrix.os == 'macos-latest'
+      shell: bash
       run: |
         # Import code signing certificate if available
         if [ ! -z "${{ secrets.MACOS_CERTIFICATE }}" ]; then
@@ -91,6 +93,7 @@ jobs:
     - name: Build release executable
       if: steps.template_check.outputs.is_template == 'false'
       working-directory: ${{ github.workspace }}
+      shell: bash
       run: |
         if [ "${{ matrix.os }}" = "macos-latest" ] && [ -z "${{ secrets.MACOS_CERTIFICATE }}" ]; then
           echo "🔨 Building macOS executable (unsigned)..."
