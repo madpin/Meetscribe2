@@ -8,8 +8,8 @@ if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <executable-file>"
     echo ""
     echo "Example:"
-    echo "  ./scripts/fix_macos_security.sh dist/aio_terminal_template"
-    echo "  ./scripts/fix_macos_security.sh ~/Downloads/aio_terminal_template-macos"
+    echo "  ./scripts/fix_macos_security.sh dist/meetscribe"
+    echo "  ./scripts/fix_macos_security.sh ~/Downloads/meetscribe-macos"
     echo ""
     echo "This script removes the macOS quarantine attribute that causes security warnings."
     exit 1

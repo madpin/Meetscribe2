@@ -1,13 +1,13 @@
 # 🚀 Next Steps & Roadmap
 
-This document outlines the recommended next steps for improving this AIO Terminal Template project, including project naming suggestions and feature roadmap.
+This document outlines the recommended next steps for improving the Meetscribe project, including feature roadmap and development priorities.
 
-## 📛 Project Naming Suggestions
+## 🎯 Current Project Status
 
-### Current Name Issues
-- "aio_terminal_template" was renamed from "cx_freeze_template" to be more descriptive
-- Project has been updated to focus on PyInstaller for cross-platform single binaries
-- Not descriptive of the application's purpose
+### Project Overview
+- **Meetscribe** - A tool to automatically convert audio recordings of meetings into structured, actionable notes
+- Uses PyInstaller for cross-platform single binaries
+- Supports global keyboard shortcuts and rich logging
 
 ### Suggested Names
 

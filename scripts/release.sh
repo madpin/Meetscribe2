@@ -134,10 +134,10 @@ check_prerequisites() {
         return 1
     fi
 
-    # Check template setup
-    print_info "Validating template setup..."
+    # Check project setup
+    print_info "Validating project setup..."
     if ! python3 scripts/validate_setup.py >/dev/null 2>&1; then
-        print_error "Template validation failed. Please resolve template placeholders first."
+        print_error "Project validation failed. Please resolve setup issues first."
         return 1
     fi
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Template Setup Validation Script
+Project Setup Validation Script
 
-This script validates that placeholder replacement worked correctly
-when someone uses this repository as a template.
+This script validates that the project is properly configured and all
+necessary files are present.
 
 Usage:
     python scripts/validate_setup.py [--fix]
 
 Options:
-    --fix    Automatically fix any remaining placeholders (dangerous!)
+    --fix    Automatically fix any configuration issues (dangerous!)
 """
 
 import re
@@ -19,25 +19,17 @@ from typing import List, Tuple
 
 
 class SetupValidator:
-    """Validates template setup and placeholder replacement."""
+    """Validates project setup and configuration."""
 
-    PLACEHOLDERS = [
-        "{{PROJECT_NAME}}",
-        "{{OWNER_NAME}}",
-        "{{REPO_NAME}}",
-        "{{PROJECT_DESCRIPTION}}",
-        "{{AUTHOR_NAME}}",
-        "{{AUTHOR_EMAIL}}",
-    ]
-
-    # Files to check for placeholders
+    # Files to check for basic validity
     CHECK_FILES = [
         "pyproject.toml",
         "config.toml",
         "README.md",
         ".github/workflows/ci.yml",
-        ".github/workflows/template-setup.yml",
-        "TEMPLATE_SETUP.md",
+        ".github/workflows/release.yml",
+        "app/cli.py",
+        "app/__init__.py",
     ]
 
     def __init__(self, root_dir: str = "."):
@@ -47,17 +39,23 @@ class SetupValidator:
 
     def validate(self) -> bool:
         """Run all validation checks."""
-        print("🔍 Validating template setup...\n")
+        print("🔍 Validating project setup...\n")
 
-        self._check_placeholders()
         self._check_project_structure()
         self._check_configuration()
+        self._check_workflows()
 
         return self._report_results()
 
     def _check_placeholders(self):
-        """Check for remaining placeholders in template files."""
-        print("📝 Checking for remaining placeholders...")
+        """Check for remaining placeholders in project files."""
+        print("📝 Checking for configuration placeholders...")
+
+        placeholder_patterns = [
+            r"your-username/your-repo",
+            r"your-email@example\.com",
+            r"your-project-name"
+        ]
 
         for file_path in self.CHECK_FILES:
             full_path = self.root_dir / file_path
@@ -66,10 +64,10 @@ class SetupValidator:
 
             try:
                 content = full_path.read_text()
-                for placeholder in self.PLACEHOLDERS:
-                    if placeholder in content:
-                        self.errors.append(
-                            (f"Found placeholder {placeholder}", f"in {file_path}")
+                for pattern in placeholder_patterns:
+                    if re.search(pattern, content):
+                        self.warnings.append(
+                            (f"Found placeholder pattern '{pattern}'", f"in {file_path}")
                         )
             except Exception as e:
                 self.warnings.append((f"Could not read {file_path}", str(e)))
@@ -91,6 +89,31 @@ class SetupValidator:
             if not full_path.exists():
                 self.errors.append(("Missing required file", file_path))
 
+    def _check_workflows(self):
+        """Check that GitHub workflows are properly configured."""
+        print("🔄 Checking GitHub workflows...")
+
+        workflow_files = [
+            ".github/workflows/ci.yml",
+            ".github/workflows/release.yml"
+        ]
+
+        for workflow_file in workflow_files:
+            workflow_path = self.root_dir / workflow_file
+            if not workflow_path.exists():
+                self.errors.append(("Missing workflow file", workflow_file))
+                continue
+
+            try:
+                content = workflow_path.read_text()
+                # Check for basic workflow validity
+                if "jobs:" not in content:
+                    self.errors.append(("Invalid workflow format", f"{workflow_file} missing jobs section"))
+                if "runs-on:" not in content:
+                    self.errors.append(("Invalid workflow format", f"{workflow_file} missing runs-on"))
+            except Exception as e:
+                self.warnings.append((f"Could not validate {workflow_file}", str(e)))
+
     def _check_configuration(self):
         """Check that configuration files are valid."""
         print("⚙️  Checking configuration...")
@@ -104,18 +127,16 @@ class SetupValidator:
                 name_match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
                 if name_match:
                     project_name = name_match.group(1)
-                    if project_name in [
-                        "my-terminal-app",
-                        "myapp",
-                        "meetscribe",
-                        "{{PROJECT_NAME}}",
-                    ]:
+                    if not project_name or project_name == "":
+                        self.errors.append(("Invalid project name", "Project name cannot be empty"))
+                    elif project_name in ["myapp", "your-app"]:
                         self.warnings.append(
-                            (
-                                "Project name may not be customized",
-                                f"Current: {project_name}",
-                            )
+                            ("Generic project name detected", f"Consider customizing: {project_name}")
                         )
+
+            # Check for version
+            if "version = " not in content:
+                self.errors.append(("Missing version", "pyproject.toml should specify a version"))
 
         # Check config.toml
         config_path = self.root_dir / "config.toml"
@@ -127,15 +148,9 @@ class SetupValidator:
                 )
                 if repo_match:
                     repo_value = repo_match.group(1)
-                    if repo_value in [
-                        "your-username/your-repo",
-                        "{{OWNER_NAME}}/{{REPO_NAME}}",
-                    ]:
+                    if repo_value in ["your-username/your-repo"]:
                         self.warnings.append(
-                            (
-                                "GitHub repository reference may not be updated",
-                                f"Current: {repo_value}",
-                            )
+                            ("GitHub repository not configured", f"Update config.toml: {repo_value}")
                         )
 
     def _report_results(self) -> bool:
@@ -143,9 +158,9 @@ class SetupValidator:
         success = len(self.errors) == 0
 
         if success:
-            print("✅ Template setup validation PASSED!")
+            print("✅ Project setup validation PASSED!")
         else:
-            print("❌ Template setup validation FAILED!")
+            print("❌ Project setup validation FAILED!")
             print("\n🚨 Critical Issues:")
             for error, detail in self.errors:
                 print(f"   • {error}: {detail}")
@@ -156,29 +171,27 @@ class SetupValidator:
                 print(f"   • {warning}: {detail}")
 
         if success:
-            print("\n🎉 Your template setup looks good!")
+            print("\n🎉 Your project setup looks good!")
             print("   You can now:")
             print("   • Run 'pip install -e .' to install dependencies")
             print("   • Run 'python -m app.cli --help' to test the CLI")
-            print(
-                "   • Run 'pyinstaller --onefile --name <your-app> app/cli.py' to build"
-            )
+            print("   • Run './scripts/release.sh' to create a new release")
 
         return success
 
     def fix_placeholders(self, dry_run: bool = True) -> bool:
-        """Attempt to fix remaining placeholders."""
+        """Attempt to fix remaining configuration issues."""
         if not self.errors:
-            print("✅ No placeholders to fix!")
+            print("✅ No issues to fix!")
             return True
 
-        print("🔧 Attempting to fix placeholders...")
+        print("🔧 Attempting to fix configuration issues...")
 
         # This is a basic implementation - in practice, you'd want more sophisticated logic
         # to determine the correct replacement values
 
         print("⚠️  Automatic fixing is not implemented yet.")
-        print("   Please manually replace the placeholders listed above.")
+        print("   Please manually resolve the issues listed above.")
 
         return False
 
@@ -187,8 +200,8 @@ def main():
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Validate template setup")
-    parser.add_argument("--fix", action="store_true", help="Attempt to fix issues")
+    parser = argparse.ArgumentParser(description="Validate project setup")
+    parser.add_argument("--fix", action="store_true", help="Attempt to fix configuration issues")
     parser.add_argument("--root", default=".", help="Root directory to check")
 
     args = parser.parse_args()
