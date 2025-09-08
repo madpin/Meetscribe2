@@ -28,6 +28,8 @@ intents = false
 output_folder = "~/Documents/Meetscribe"
 # Default folder for input audio files.
 input_folder = "~/Audio"
+# Default extension for output files (without leading dot)
+output_extension = "md"
 
 [processing]
 # When true, reprocess audio files even if the output .txt already exists (overwrite).

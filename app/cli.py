@@ -126,7 +126,7 @@ def process_directory(
     llm_generator = None
     if effective_llm:
         try:
-            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger)
+            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger, ctx.config.paths.output_extension)
             mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
             ctx.logger.info(f"LLM post-processing enabled for modes: {mode_str}")
         except Exception as e:
@@ -205,7 +205,7 @@ def process_directory(
         result = interactive_select_files(
             files, output_folder, ctx.config.ui.selection_page_size, ctx.logger,
             note_keys=ctx.config.llm.keys.model_dump(), initial_modes=selected_modes,
-            llm_output_map=llm_output_map
+            llm_output_map=llm_output_map, output_extension=ctx.config.paths.output_extension
         )
         if result is None:
             ctx.logger.info("Selection cancelled")
@@ -381,7 +381,7 @@ def process_file(
     llm_generator = None
     if effective_llm:
         try:
-            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger)
+            llm_generator = LLMNotesGenerator(ctx.config.llm, ctx.logger, ctx.config.paths.output_extension)
             mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
             ctx.logger.info(f"LLM post-processing enabled for modes: {mode_str}")
         except Exception as e:

@@ -26,16 +26,18 @@ class LLMNotesGenerator:
     in the future (e.g., Glean, MCP).
     """
 
-    def __init__(self, cfg: LLMConfig, logger):
+    def __init__(self, cfg: LLMConfig, logger, output_extension: str):
         """
         Initialize the LLM notes generator.
 
         Args:
             cfg: LLM configuration containing model, prompts, and API settings
             logger: Logger instance for status and error messages
+            output_extension: File extension for output files (without leading dot)
         """
         self.cfg = cfg
         self.logger = logger
+        self.ext = f".{(output_extension or 'md').lstrip('.')}"
         self.llm = ChatOpenAI(
             model=cfg.model,
             temperature=cfg.temperature,
@@ -108,7 +110,7 @@ class LLMNotesGenerator:
             try:
                 folder = self._resolve_output_folder(mode, base_output)
                 ensure_directory_exists(folder, self.logger)
-                target = folder / f"{file_stem}.{mode}.txt"
+                target = folder / f"{file_stem}.{mode}{self.ext}"
 
                 if not reprocess and target.exists():
                     self.logger.info(f"Skipping LLM {mode} for {file_stem}: {target} already exists")

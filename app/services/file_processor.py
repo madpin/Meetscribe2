@@ -83,7 +83,8 @@ class FileProcessor:
         """
         candidates = []
         for file in files:
-            out = output_folder / f"{file.stem}.txt"
+            ext = f".{self.cfg.paths.output_extension.lstrip('.')}"
+            out = output_folder / f"{file.stem}{ext}"
             if not reprocess and out.exists():
                 self.logger.debug(f"Skipping {file.name}: output already exists")
                 continue
@@ -344,7 +345,8 @@ class FileProcessor:
             Tuple of (target_output_path, metadata_block, original_output_path)
         """
         default_stem = file.stem
-        default_out = output_folder / f"{default_stem}.txt"
+        ext = f".{self.cfg.paths.output_extension.lstrip('.')}"
+        default_out = output_folder / f"{default_stem}{ext}"
 
         if not calendar_linker:
             return default_out, None, None
@@ -361,11 +363,11 @@ class FileProcessor:
 
         # Match found, compute new stem and paths
         new_stem = calendar_linker.compute_target_stem(matched_event)
-        new_out = output_folder / f"{new_stem}.txt"
+        new_out = output_folder / f"{new_stem}{ext}"
 
         # Generate unique path if needed (when not reprocessing)
         if new_out.exists():
-            new_out = generate_unique_path(output_folder, new_stem, ".txt")
+            new_out = generate_unique_path(output_folder, new_stem, ext)
 
         # Generate metadata block
         metadata_block = calendar_linker.format_event_metadata(matched_event, file)

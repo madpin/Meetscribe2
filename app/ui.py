@@ -21,7 +21,8 @@ def interactive_select_files(
     logger,
     note_keys: dict[str, str],
     initial_modes: Optional[set[str]] = None,
-    llm_output_map: Optional[dict[str, Path]] = None
+    llm_output_map: Optional[dict[str, Path]] = None,
+    output_extension: str = "txt"
 ) -> Optional[tuple[list[Path], dict[Path, set[str]]]]:
     """
     Interactive file selection with arrow keys, space bar, and per-file Q/W/E mode toggling.
@@ -34,6 +35,7 @@ def interactive_select_files(
         note_keys: Dictionary mapping mode letters to key strings (e.g., {'q': 'Q', 'w': 'W', 'e': 'E'})
         initial_modes: Initial set of active modes for all files, defaults to all modes if None
         llm_output_map: Optional mapping of mode to output folder (e.g., {'Q': Path, 'W': Path, 'E': Path})
+        output_extension: File extension for output files (without leading dot)
 
     Returns:
         Tuple of (selected_files, file_modes_dict), or None if cancelled.
@@ -48,6 +50,9 @@ def interactive_select_files(
         return None
 
     console = Console()
+
+    # Compute extension with leading dot
+    dot_ext = f".{output_extension.lstrip('.')}"
 
     # Pagination state
     current_page = 0
@@ -95,7 +100,7 @@ def interactive_select_files(
             duration_str = format_duration(duration)
 
             # Check if file has been processed
-            output_file = output_folder / f"{file_path.stem}.txt"
+            output_file = output_folder / f"{file_path.stem}{dot_ext}"
             processed = output_file.exists()
 
             # Get mode status for this file
@@ -108,7 +113,7 @@ def interactive_select_files(
                 if llm_output_map:
                     mode_upper = note_keys[mode]  # e.g., 'Q', 'W', 'E'
                     if mode_upper in llm_output_map:
-                        llm_output_file = llm_output_map[mode_upper] / f"{file_path.stem}.{mode_upper}.txt"
+                        llm_output_file = llm_output_map[mode_upper] / f"{file_path.stem}.{mode_upper}{dot_ext}"
                         processed_modes[mode] = llm_output_file.exists()
                     else:
                         processed_modes[mode] = False
@@ -223,17 +228,13 @@ def interactive_select_files(
                         logger.debug(f"UI selected: {file.name} -> modes: {''.join(sorted(modes)) if modes else 'None'}")
                     return result_files, result_modes
                 else:
-                    # No files explicitly selected - return current file if it has modes enabled
+                    # No files explicitly selected - return the highlighted file with its current modes (may be empty)
                     current_file = current_page_files[current_index]
                     modes = file_modes[current_file]
-                    if modes:
-                        # Convert lowercase modes back to uppercase for CLI compatibility
-                        uppercase_modes = {mode.upper() for mode in modes}
-                        logger.debug(f"UI current: {current_file.name} -> modes: {''.join(sorted(uppercase_modes))}")
-                        return [current_file], {current_file: uppercase_modes}
-                    else:
-                        logger.debug(f"UI current file {current_file.name} has no modes enabled")
-                        return [], {}
+                    # Convert lowercase modes back to uppercase for CLI compatibility
+                    uppercase_modes = {mode.upper() for mode in modes}
+                    logger.debug(f"UI current: {current_file.name} -> modes: {''.join(sorted(uppercase_modes)) if uppercase_modes else 'None'}")
+                    return [current_file], {current_file: uppercase_modes}
             elif k in (rkey.ESC,):
                 return None
             elif k.upper() in note_keys.values():

@@ -29,11 +29,14 @@ class PathsConfig(BaseModel):
     """File system paths configuration."""
     input_folder: Path = Path("~/Audio")
     output_folder: Path = Path("~/Documents/Meetscribe")
+    output_extension: str = "md"
 
     def expand(self):
         """Expand user paths to absolute paths."""
         self.input_folder = self.input_folder.expanduser()
         self.output_folder = self.output_folder.expanduser()
+        # Normalize output extension: remove leading dot, lowercase, default to md
+        self.output_extension = (self.output_extension or "md").strip().lstrip('.').lower() or "md"
         return self
 
 
