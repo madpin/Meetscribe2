@@ -6,8 +6,78 @@ on:
       - 'v*.*.*'
 
 jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check template status
+      id: template_check
+      shell: bash
+      run: |
+        if grep -q "{{.*}}" pyproject.toml; then
+          echo "is_template=true" >> $GITHUB_OUTPUT
+          echo "📋 Running in TEMPLATE MODE - placeholders found"
+        else
+          echo "is_template=false" >> $GITHUB_OUTPUT
+          echo "✅ Running in INSTANTIATED MODE - no placeholders"
+        fi
+
+    - name: Skip release creation (template mode)
+      if: steps.template_check.outputs.is_template == 'true'
+      run: |
+        echo "⚠️ Skipping release creation - template placeholders still present"
+        echo "Please run template setup first before creating releases"
+        exit 1
+
+    - name: Get release notes
+      id: release_notes
+      run: |
+        # Extract version from tag
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref }}
+        name: Release ${{ steps.release_notes.outputs.version }}
+        body: |
+          ## What's New in ${{ steps.release_notes.outputs.version }}
+
+          ### Downloads
+          - **Linux:** `meetscribe-linux.tar.gz`
+          - **macOS:** `meetscribe-macos.tar.gz`
+          - **Windows:** `meetscribe-windows.zip`
+
+          ### Installation
+          1. Download the appropriate file for your operating system
+          2. Extract the archive
+          3. Run the `meetscribe` executable (or `meetscribe.exe` on Windows)
+
+          ### Features
+          - Standalone executable with no Python dependencies required
+          - Global keyboard shortcuts for quick actions
+          - Screenshot capture with clipboard integration
+          - Configurable via TOML files
+          - Cross-platform support
+
+          For detailed usage instructions, see the [Quick Start Guide](docs/quick_start.md).
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release:
     runs-on: ${{ matrix.os }}
+    needs: create_release
+    if: needs.create_release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -34,33 +104,13 @@ jobs:
       with:
         python-version: "3.11"
 
-    - name: Check template status
-      id: template_check
-      shell: bash
-      run: |
-        if grep -q "{{.*}}" pyproject.toml; then
-          echo "is_template=true" >> $GITHUB_OUTPUT
-          echo "📋 Running in TEMPLATE MODE - placeholders found"
-        else
-          echo "is_template=false" >> $GITHUB_OUTPUT
-          echo "✅ Running in INSTANTIATED MODE - no placeholders"
-        fi
-
     - name: Install dependencies
-      if: steps.template_check.outputs.is_template == 'false'
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
 
-    - name: Skip build (template mode)
-      if: steps.template_check.outputs.is_template == 'true'
-      run: |
-        echo "⚠️ Skipping release build - template placeholders still present"
-        echo "Please run template setup first before creating releases"
-        exit 1
-
     - name: Set up code signing (macOS)
-      if: steps.template_check.outputs.is_template == 'false' && matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-latest'
       shell: bash
       run: |
         # Import code signing certificate if available
@@ -81,7 +131,6 @@ jobs:
         fi
 
     - name: Debug working directory
-      if: steps.template_check.outputs.is_template == 'false'
       run: |
         echo "Current working directory: $(pwd)"
         echo "Files in current directory:"
@@ -91,7 +140,6 @@ jobs:
       shell: bash
 
     - name: Build release executable
-      if: steps.template_check.outputs.is_template == 'false'
       working-directory: ${{ github.workspace }}
       shell: bash
       run: |
@@ -106,7 +154,6 @@ jobs:
         CODESIGN_IDENTITY: ${{ env.CODESIGN_IDENTITY }}
 
     - name: Create distribution archive
-      if: steps.template_check.outputs.is_template == 'false'
       working-directory: ${{ github.workspace }}
       run: |
         # Create a temporary directory for packaging
@@ -121,62 +168,27 @@ jobs:
         fi
       shell: bash
 
-    - name: Upload release asset
-      if: steps.template_check.outputs.is_template == 'false'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./${{ matrix.asset_name }}.tar.gz
-        asset_name: ${{ matrix.asset_name }}.tar.gz
-        asset_content_type: application/gzip
-
-  create_release:
-    needs: release
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Get release notes
-      id: release_notes
+    - name: Install GitHub CLI
       run: |
-        # Extract version from tag
-        VERSION=${GITHUB_REF#refs/tags/v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          choco install gh
+        else
+          # GitHub CLI is pre-installed on Ubuntu and macOS runners
+          echo "GitHub CLI already available"
+        fi
 
-        # Generate release notes from recent commits
-        echo "Generating release notes for version $VERSION..."
+    - name: Upload release asset
+      shell: bash
+      run: |
+        # Determine the correct archive file extension
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          ARCHIVE_FILE="${{ matrix.asset_name }}.zip"
+        else
+          ARCHIVE_FILE="${{ matrix.asset_name }}.tar.gz"
+        fi
 
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
+        # Upload the asset using GitHub CLI
+        echo "📤 Uploading $ARCHIVE_FILE to release..."
+        gh release upload ${{ github.ref }} "$ARCHIVE_FILE" --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.release_notes.outputs.version }}
-        body: |
-          ## What's New in ${{ steps.release_notes.outputs.version }}
-
-          ### Downloads
-          - **Linux:** `meetscribe-linux.tar.gz`
-          - **macOS:** `meetscribe-macos.tar.gz`
-          - **Windows:** `meetscribe-windows.zip`
-
-          ### Installation
-          1. Download the appropriate file for your operating system
-          2. Extract the archive
-          3. Run the `meetscribe` executable (or `meetscribe.exe` on Windows)
-
-          ### Features
-          - Standalone executable with no Python dependencies required
-          - Global keyboard shortcuts for quick actions
-          - Screenshot capture with clipboard integration
-          - Configurable via TOML files
-          - Cross-platform support
-
-          For detailed usage instructions, see the [Quick Start Guide](docs/quick_start.md).
-        draft: false
-        prerelease: false
