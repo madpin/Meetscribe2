@@ -66,10 +66,13 @@ confirm() {
     echo -e "${YELLOW}$message $prompt${NC}"
     read -r response
 
+    # Trim whitespace and convert to lowercase for comparison
+    response=$(echo "$response" | tr '[:upper:]' '[:lower:]' | xargs)
+
     if [ "$default" = "y" ]; then
-        [ "$response" = "" ] || [[ "$response" =~ ^[Yy]$ ]]
+        [ -z "$response" ] || [ "$response" = "y" ] || [ "$response" = "yes" ]
     else
-        [[ "$response" =~ ^[Yy]$ ]]
+        [ "$response" = "y" ] || [ "$response" = "yes" ]
     fi
 }
 
