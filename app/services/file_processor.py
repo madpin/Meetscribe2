@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from app.core.config_models import AppConfig
-from app.core.utils import ensure_directory_exists
+from app.core.utils import ensure_directory_exists, generate_unique_path
 from app.transcriber import SUPPORTED_EXTENSIONS, Transcriber
 
 
@@ -112,9 +112,9 @@ class FileProcessor:
             return None  # Caller should prompt user
         return False
 
-    def run_batch(self, files: List[Path], reprocess: bool, transcriber: Transcriber, output_folder: Path, llm_generator=None, llm_modes=None) -> Tuple[int, int]:
+    def run_batch(self, files: List[Path], reprocess: bool, transcriber: Transcriber, output_folder: Path, llm_generator=None, llm_modes=None, calendar_linker=None) -> Tuple[int, int]:
         """
-        Process a batch of audio files with optional LLM note generation.
+        Process a batch of audio files with optional LLM note generation and calendar linking.
 
         Args:
             files: List of files to process
@@ -125,6 +125,7 @@ class FileProcessor:
             llm_modes: Optional modes configuration. Can be:
                 - set[str]: Global modes for all files (backward compatibility)
                 - dict[Path, set[str]]: Per-file modes for interactive selection
+            calendar_linker: Optional CalendarLinker instance for calendar integration
 
         Returns:
             Tuple of (processed_count, skipped_count)
@@ -139,15 +140,24 @@ class FileProcessor:
                 self.logger.debug(f"Processing with global modes: {''.join(sorted(llm_modes))}")
 
         for file in files:
-            out = output_folder / f"{file.stem}.txt"
+            # Determine target output path and metadata block
+            target_out, metadata_block, original_out = self._determine_output_paths(file, output_folder, calendar_linker)
+
+            # If calendar linking is enabled and user cancelled selection, skip this file
+            if calendar_linker and metadata_block is calendar_linker.USER_CANCELLED:
+                self.logger.info(f"Skipping {file.name} - user cancelled calendar event selection")
+                skipped += 1
+                continue
+
+            target_stem = target_out.stem
 
             # Debug logging for per-file modes
             if llm_modes and isinstance(llm_modes, dict):
                 file_modes_debug = self._get_modes_for_file(file, llm_modes)
                 self.logger.debug(f"PROC {file.name} modes: {file_modes_debug}")
 
-            # Check if transcription already exists
-            transcription_exists = out.exists()
+            # Check if target transcription already exists
+            transcription_exists = target_out.exists()
 
             if transcription_exists and not reprocess:
                 # Smart processing: transcription exists and we're not reprocessing
@@ -159,8 +169,8 @@ class FileProcessor:
                         self.logger.info(f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})")
 
                         try:
-                            existing_content = out.read_text()
-                            llm_generator.generate_for_modes(existing_content, file_modes, file.stem, output_folder, reprocess)
+                            existing_content = target_out.read_text()
+                            llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, reprocess)
                             processed += 1
                         except Exception as e:
                             self.logger.error(f"Failed to generate LLM notes from existing transcription for {file.name}: {e}")
@@ -179,14 +189,14 @@ class FileProcessor:
 
                 try:
                     # Read existing transcription
-                    existing_content = out.read_text()
+                    existing_content = target_out.read_text()
                     self.logger.info(f"Loaded existing transcription for {file.name} ({len(existing_content)} chars)")
 
                     # Generate LLM notes if requested
                     if llm_generator and llm_modes:
                         file_modes = self._get_modes_for_file(file, llm_modes)
                         if file_modes:
-                            llm_generator.generate_for_modes(existing_content, file_modes, file.stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, reprocess)
                             self.logger.info(f"LLM notes regenerated for {file.name}")
                         else:
                             self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
@@ -201,12 +211,59 @@ class FileProcessor:
 
                 continue
 
+            # Handle migration from old naming to new naming
+            migrated = False
+            if not transcription_exists and original_out and original_out.exists() and not reprocess:
+                self.logger.info(f"Migrating existing transcription from {original_out.name} to {target_out.name}")
+                try:
+                    existing_content = original_out.read_text()
+
+                    # Prepend metadata block if calendar linking was successful
+                    if metadata_block and not existing_content.startswith("## Linked Calendar Event"):
+                        full_content = metadata_block + "\n\n" + existing_content
+                    else:
+                        full_content = existing_content
+
+                    # Write to new location
+                    with open(target_out, "w") as fp:
+                        fp.write(full_content)
+
+                    # Generate LLM notes if requested
+                    if llm_generator and llm_modes:
+                        try:
+                            file_modes = self._get_modes_for_file(file, llm_modes)
+                            self.logger.debug(f"Generating LLM for {file.name} with modes: {file_modes}")
+                            if file_modes:
+                                llm_generator.generate_for_modes(full_content, file_modes, target_stem, output_folder, reprocess)
+                                self.logger.info(f"LLM notes generated for migrated {file.name}")
+                            else:
+                                self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                        except Exception as e:
+                            self.logger.error(f"Failed to generate LLM notes for migrated {file.name}: {e}")
+
+                    processed += 1
+                    migrated = True
+
+                except Exception as e:
+                    self.logger.error(f"Failed to migrate {file.name}: {e}")
+                    processed += 1  # Still count as processed even if migration fails
+
+            if migrated:
+                continue
+
             # Transcription doesn't exist, process the file normally
             try:
                 notes = transcriber.process_audio_file(file)
-                with open(out, "w") as fp:
-                    fp.write(notes)
-                self.logger.info(f"Transcription completed and saved to {out}")
+
+                # Prepend metadata block if calendar linking was successful
+                if metadata_block:
+                    full_notes = metadata_block + "\n\n" + notes
+                else:
+                    full_notes = notes
+
+                with open(target_out, "w") as fp:
+                    fp.write(full_notes)
+                self.logger.info(f"Transcription completed and saved to {target_out}")
 
                 # Generate LLM notes if requested
                 if llm_generator and llm_modes:
@@ -215,7 +272,7 @@ class FileProcessor:
                         file_modes = self._get_modes_for_file(file, llm_modes)
                         self.logger.debug(f"Generating LLM for {file.name} with modes: {file_modes}")
                         if file_modes:
-                            llm_generator.generate_for_modes(notes, file_modes, file.stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(full_notes, file_modes, target_stem, output_folder, reprocess)
                             self.logger.info(f"LLM notes generated for {file.name}")
                         else:
                             self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
@@ -226,8 +283,15 @@ class FileProcessor:
             except Exception as e:
                 self.logger.error(f"Failed to process {file}: {e}")
                 notes = f"Error: Could not process {file}."
-                with open(out, "w") as fp:
-                    fp.write(notes)
+
+                # Prepend metadata block even for errors if calendar linking was successful
+                if metadata_block:
+                    full_notes = metadata_block + "\n\n" + notes
+                else:
+                    full_notes = notes
+
+                with open(target_out, "w") as fp:
+                    fp.write(full_notes)
 
                 # Even for errors, try to generate LLM notes if requested (from error message)
                 if llm_generator and llm_modes:
@@ -235,7 +299,7 @@ class FileProcessor:
                         # Get modes for this specific file
                         file_modes = self._get_modes_for_file(file, llm_modes)
                         if file_modes:
-                            llm_generator.generate_for_modes(notes, file_modes, file.stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(full_notes, file_modes, target_stem, output_folder, reprocess)
                     except Exception as llm_error:
                         self.logger.error(f"Failed to generate LLM notes for error case {file.name}: {llm_error}")
 
@@ -281,3 +345,44 @@ class FileProcessor:
 
         # Fallback
         return set()
+
+    def _determine_output_paths(self, file: Path, output_folder: Path, calendar_linker) -> Tuple[Path, Optional[str], Optional[Path]]:
+        """
+        Determine the output paths and metadata block for a file.
+
+        Args:
+            file: Input audio file
+            output_folder: Output folder path
+            calendar_linker: Optional CalendarLinker instance
+
+        Returns:
+            Tuple of (target_output_path, metadata_block, original_output_path)
+        """
+        default_stem = file.stem
+        default_out = output_folder / f"{default_stem}.txt"
+
+        if not calendar_linker:
+            return default_out, None, None
+
+        # Try to match file to calendar event
+        matched_event = calendar_linker.match_file(file)
+
+        if matched_event is calendar_linker.USER_CANCELLED:
+            # User cancelled selection - return special marker
+            return default_out, calendar_linker.USER_CANCELLED, None
+        elif not matched_event:
+            # No match found, use default naming
+            return default_out, None, None
+
+        # Match found, compute new stem and paths
+        new_stem = calendar_linker.compute_target_stem(matched_event)
+        new_out = output_folder / f"{new_stem}.txt"
+
+        # Generate unique path if needed (when not reprocessing)
+        if new_out.exists():
+            new_out = generate_unique_path(output_folder, new_stem, ".txt")
+
+        # Generate metadata block
+        metadata_block = calendar_linker.format_event_metadata(matched_event, file)
+
+        return new_out, metadata_block, default_out

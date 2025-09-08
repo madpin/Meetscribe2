@@ -191,6 +191,65 @@ class GoogleCalendarClient:
             self.logger.error(f"Failed to list calendar events: {e}")
             raise GoogleCalendarError(f"Failed to list calendar events: {e}") from e
 
+    def list_events_between(self, start: datetime, end: datetime, calendar_id: Optional[str] = None, filter_group_events: Optional[bool] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        List events between two datetime objects from Google Calendar.
+
+        Args:
+            start: Start datetime (timezone-aware)
+            end: End datetime (timezone-aware)
+            calendar_id: Calendar ID to query (uses config default if None)
+            filter_group_events: If True, only return events with 2 or more attendees (uses config default if None)
+            limit: Maximum number of events to return (uses config default if None)
+
+        Returns:
+            List of event dictionaries with attendees, description, attachments
+
+        Raises:
+            GoogleCalendarError: If API call fails
+        """
+        # Use config defaults if parameters not provided
+        limit = limit if limit is not None else self.cfg.max_results
+        calendar_id = calendar_id if calendar_id is not None else self.cfg.calendar_id
+        filter_group_events = filter_group_events if filter_group_events is not None else self.cfg.filter_group_events_only
+
+        # Convert to UTC and format as ISO8601 with 'Z'
+        import datetime
+        start_utc = start.astimezone(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+        end_utc = end.astimezone(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        self.logger.info(f"Fetching events between {start_utc} and {end_utc}, limit: {limit}")
+
+        try:
+            events_result = self.service.events().list(
+                calendarId=calendar_id,
+                timeMin=start_utc,
+                timeMax=end_utc,
+                singleEvents=True,
+                orderBy='startTime',
+                maxResults=limit,
+                fields="items(id,summary,description,attendees(email,displayName,responseStatus),attachments(fileUrl,title,mimeType,iconLink),start,end,htmlLink),nextPageToken",
+            ).execute()
+
+            events = events_result.get('items', [])
+            self.logger.info(f"Retrieved {len(events)} events between specified times")
+
+            # Filter events based on attendee count if requested
+            if filter_group_events:
+                filtered_events = []
+                for event in events:
+                    attendees = event.get('attendees', [])
+                    if len(attendees) >= 2:
+                        filtered_events.append(event)
+                events = filtered_events
+                self.logger.info(f"Filtered to {len(events)} group events (2 or more attendees)")
+
+            return events
+
+        except Exception as e:
+            self.logger.error(f"Failed to list calendar events between times: {e}")
+            raise GoogleCalendarError(f"Failed to list calendar events between times: {e}") from e
+
     @staticmethod
     def parse_event_start_local(event: Dict[str, Any]) -> str:
         """

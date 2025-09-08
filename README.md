@@ -18,6 +18,7 @@ Meetscribe is a tool that automatically converts audio recordings of meetings in
 - **🛡️ Safe Batch Processing:** Configurable soft and hard limits prevent accidental large batch runs with user confirmation prompts.
 - **📦 Standalone Application:** Packaged as a single, standalone binary file, so you can distribute it as a self-contained application that runs on its own without requiring users to install Python or any other dependencies.
 - **📅 Google Calendar Integration:** List past calendar events with attendees, descriptions, and attachment names directly from your terminal.
+- **🔗 Calendar-to-File Auto-Linking:** Automatically match audio files to Google Calendar events by modification time, rename outputs to YYYY-MM-DD_Title format, and include event metadata in notes. Events must start before file modification time to ensure logical matching.
 
 ## 🏗️ Architecture Overview
 
@@ -101,6 +102,18 @@ python -m app.cli process dir /path/to/audio --llm --reprocess
 # Force complete reprocessing including audio transcription
 # (if you want to re-run transcription + regenerate LLM notes)
 python -m app.cli process dir /path/to/audio --llm --reprocess  # Uses existing .txt files when available
+
+# Auto-link files to calendar events and rename outputs
+python -m app.cli process dir /path/to/audio --link-calendar
+
+# Interactive calendar event selection (Ctrl+C or '0' to skip processing file)
+python -m app.cli process dir /path/to/audio --link-calendar --select-calendar-event
+
+# Combine calendar linking with LLM processing
+python -m app.cli process dir /path/to/audio --link-calendar --llm --notes QWE
+
+# Process single file with calendar linking
+python -m app.cli process file meeting.wav --link-calendar --llm --notes Q
 ```
 
 ## 🚀 Quick Usage

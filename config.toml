@@ -56,6 +56,7 @@ calendar_id = "primary"
 default_past_days = 3
 max_results = 50
 filter_group_events_only = true
+match_tolerance_minutes = 90
 
 [llm]
 # LLM post-processing configuration

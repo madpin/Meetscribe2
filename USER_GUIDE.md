@@ -5,6 +5,8 @@
 - [What You Need](#what-you-need)
 - [Installation and Setup](#installation-and-setup)
 - [Configuration](#configuration)
+- [Google Calendar Setup](#google-calendar-setup)
+- [Calendar-to-File Auto-Linking](#calendar-to-file-auto-linking)
 - [Usage](#usage)
 - [LLM Post-Processing](#llm-post-processing)
 - [Output and Results](#output-and-results)
@@ -123,6 +125,7 @@ Meetscribe converts meeting audio recordings into structured notes. It transcrib
 - **`default_past_days`** (integer, optional): Default number of past days to query (default: `7`)
 - **`max_results`** (integer, optional): Default maximum number of events to return (default: `50`)
 - **`filter_group_events_only`** (boolean, optional): Only show events with 2 or more attendees (default: `true`)
+- **`match_tolerance_minutes`** (integer, optional): Time tolerance in minutes for matching audio files to calendar events (default: `90`)
 
 #### Configuration Loading
 1. `config.toml` is loaded first (required)
@@ -205,6 +208,133 @@ The command displays events in a Rich-formatted table with:
 - **Description**: Event description (may be truncated for long descriptions)
 - **Attachments**: Names of files attached to the event
 
+## Calendar-to-File Auto-Linking
+
+Meetscribe can automatically match audio files to Google Calendar events and enhance your notes with event metadata. When enabled, files are matched to the closest calendar event within a configurable time tolerance, and outputs are renamed to include event information.
+
+### How It Works
+
+1. **File Matching**: Each audio file's modification time is compared to your calendar events
+2. **Time Tolerance**: Files are matched to events within the configured tolerance window (default: 90 minutes)
+3. **Event Timing Constraint**: Events must start **before** the file's modification time (ensures recordings match past meetings)
+4. **Automatic Renaming**: Matched files are renamed from `original_name.txt` to `YYYY-MM-DD_Event_Title.txt`
+5. **Metadata Injection**: Event details (title, time, attendees, attachments, description) are prepended to the notes
+6. **LLM Integration**: When using LLM modes, outputs follow the new naming pattern
+
+### Usage
+
+```bash
+# Process files with calendar linking enabled
+python -m app.cli process dir /path/to/audio --link-calendar
+
+# Interactive calendar event selection
+python -m app.cli process dir /path/to/audio --link-calendar --select-calendar-event
+
+# Combine with LLM processing for enhanced notes
+python -m app.cli process dir /path/to/audio --link-calendar --llm --notes QWE
+
+# Single file with calendar linking
+python -m app.cli process file meeting.wav --link-calendar
+```
+
+### Configuration
+
+Adjust the matching tolerance in your configuration:
+
+```toml
+[google]
+match_tolerance_minutes = 90  # How close file time must be to event time (in minutes)
+```
+
+### Output Format
+
+When a file is successfully linked to a calendar event, the output includes:
+
+```txt
+## Linked Calendar Event
+
+**Title:** Team Standup Meeting
+**When:** 2024-01-15 10:00 — 10:30
+**Attendees:** alice@company.com, bob@company.com, charlie@company.com
+**Attachments:** agenda.pdf, meeting_notes.docx
+**Event Link:** https://calendar.google.com/event?eid=...
+**Source Audio:** team_standup_20240115.wav
+**Calendar:** primary
+
+**Description:**
+Weekly team standup to discuss project progress and blockers.
+
+---
+
+[Transcription content follows...]
+```
+
+### Interactive Event Selection
+
+When using `--select-calendar-event` with `--link-calendar`, the system will **always** prompt you to manually select which calendar event to link to your audio file. This gives you full control over the linking process, even when only one event is found. This is useful when:
+
+- You want to review the event details before linking
+- Multiple events exist within the tolerance window
+- The automatic closest-match selection isn't the right event
+- You want to skip linking to any event
+
+**Example Interactive Prompts:**
+
+**For single event:**
+```
+📅 One calendar event found for team_meeting.wav
+Please select which event to link to:
+────────────────────────────────────────────────────────────
+1. Daily Team Standup
+   Attendees: 8
+   Time: 2024-09-08 09:00
+────────────────────────────────────────────────────────────
+0. Skip - Don't link this file to any event
+
+Enter your choice (1 to link to this event, or 0 to skip):
+```
+
+**For multiple events:**
+```
+📅 3 calendar events found for team_meeting.wav
+Please select which event to link to:
+────────────────────────────────────────────────────────────
+1. Daily Team Standup
+   Attendees: 8
+   Time: 2024-09-08 09:00
+
+2. Sprint Planning Meeting
+   Attendees: 6
+   Time: 2024-09-08 10:30
+
+3. Design Review
+   Attendees: 4
+   Time: 2024-09-08 14:00
+────────────────────────────────────────────────────────────
+0. Skip - Don't link this file to any event
+
+Enter your choice (1-3, or 0 to skip):
+```
+
+**Selection Options:**
+- **1-3**: Select the corresponding event (shown with title, attendee count, and time)
+- **0**: Skip linking this file to any event (**file will not be processed**)
+- **Ctrl+C**: Cancel the entire operation (**file will not be processed**)
+
+### Migration Behavior
+
+- **Existing files**: If an audio file already has a `.txt` output in the old naming format, and calendar linking finds a match, the existing content is migrated to the new naming format with event metadata prepended
+- **LLM outputs**: All LLM-generated files (`.Q.txt`, `.W.txt`, `.E.txt`) follow the new naming convention when calendar linking is enabled
+- **No breaking changes**: Files that don't match any events retain their original naming
+
+### Tips
+
+- **Time zones**: All times are displayed in your local timezone for accuracy
+- **Event types**: Both timed events and all-day events are supported
+- **Multiple matches**: The closest event within the tolerance window is always selected
+- **Event timing**: Only events that start before the file's modification time are considered (prevents future events from matching)
+- **Fallback naming**: Files that don't match any events use the original filename
+
 ## Usage
 
 ### Prepare Your Audio
@@ -257,6 +387,16 @@ meetscribe process list <path_to_audio_folder>
 # Process a single file directly
 meetscribe process file <path_to_audio_file>
 meetscribe process file <path_to_audio_file> --reprocess
+
+# Auto-link files to calendar events and rename outputs
+meetscribe process dir <path_to_audio_folder> --link-calendar
+meetscribe process file <path_to_audio_file> --link-calendar
+
+# Interactive calendar event selection
+meetscribe process dir <path_to_audio_folder> --link-calendar --select-calendar-event
+
+# Combine calendar linking with LLM processing
+meetscribe process dir <path_to_audio_folder> --link-calendar --llm --notes QWE
 ```
 
 **Examples**:

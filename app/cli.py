@@ -16,6 +16,7 @@ from app.core.context import AppContext
 from app.core.exceptions import ConfigurationError, TranscriptionError, GoogleCalendarError
 from app.services.file_processor import FileProcessor
 from app.services.llm_notes import LLMNotesGenerator
+from app.services.calendar_linker import CalendarLinker
 from app.ui import interactive_select_files
 from app.transcriber import Transcriber
 from app.integrations.google_calendar import GoogleCalendarClient
@@ -80,6 +81,16 @@ def process_directory(
         "-n",
         help="LLM notes to generate: any combination of Q, W, E. Example: QWE or QW.",
     ),
+    link_calendar: bool = typer.Option(
+        False,
+        "--link-calendar",
+        help="Auto-link files to closest calendar event and rename outputs to YYYY-MM-DD_Title; include event metadata in notes.",
+    ),
+    select_calendar_event: bool = typer.Option(
+        False,
+        "--select-calendar-event",
+        help="When used with --link-calendar, interactively select which calendar event to link to instead of auto-matching.",
+    ),
 ):
     """
     Process all audio files in a directory and generate meeting notes.
@@ -87,6 +98,8 @@ def process_directory(
     Use --select for interactive multiple-file selection with Q/W/E mode toggling.
     Use --llm/--no-llm to enable/disable LLM post-processing.
     Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
+    Use --link-calendar to auto-link files to calendar events and rename outputs.
+    Use --select-calendar-event with --link-calendar for interactive event selection.
     """
     ctx = get_app_context()
 
@@ -120,6 +133,20 @@ def process_directory(
             ctx.logger.error(f"Failed to initialize LLM generator: {e}")
             ctx.logger.warning("Continuing without LLM post-processing")
             effective_llm = False
+
+    # Initialize calendar linker if requested
+    calendar_linker = None
+    if link_calendar:
+        try:
+            calendar_linker = CalendarLinker(ctx.config.google, ctx.logger, select_calendar_event)
+            if select_calendar_event:
+                ctx.logger.info(f"Calendar linking enabled with manual event selection")
+            else:
+                ctx.logger.info(f"Calendar linking enabled with {ctx.config.google.match_tolerance_minutes} min tolerance")
+        except (ConfigurationError, GoogleCalendarError) as e:
+            ctx.logger.error(f"Failed to initialize calendar linker: {e}")
+            ctx.logger.warning("Continuing without calendar linking")
+            link_calendar = False
 
     # Resolve input folder
     input_dir = processor.resolve_input_folder(audio_directory)
@@ -199,9 +226,13 @@ def process_directory(
 
         # Process selected files with reprocess=True (since user chose them)
         # Pass per-file modes to the processor
-        processed_count, skipped_count = processor.run_batch(
-            selected_files, True, transcriber, output_folder, llm_generator, file_modes_dict
-        )
+        try:
+            processed_count, skipped_count = processor.run_batch(
+                selected_files, True, transcriber, output_folder, llm_generator, file_modes_dict, calendar_linker
+            )
+        except KeyboardInterrupt:
+            ctx.logger.info("Processing cancelled by user (Ctrl+C)")
+            raise typer.Exit(130)  # Standard exit code for SIGINT
 
         # Calculate mode summary for logging
         all_modes = set()
@@ -217,9 +248,13 @@ def process_directory(
     else:
         # Batch processing mode
         candidates = processor.get_files_to_process(files, effective_reprocess, output_folder)
-        processed_count, skipped_count = processor.run_batch(
-            candidates, effective_reprocess, transcriber, output_folder, llm_generator, selected_modes
-        )
+        try:
+            processed_count, skipped_count = processor.run_batch(
+                candidates, effective_reprocess, transcriber, output_folder, llm_generator, selected_modes, calendar_linker
+            )
+        except KeyboardInterrupt:
+            ctx.logger.info("Processing cancelled by user (Ctrl+C)")
+            raise typer.Exit(130)  # Standard exit code for SIGINT
 
         mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
         ctx.logger.info(f"Summary: Processed={processed_count}, Skipped={skipped_count}, Total candidates={len(candidates)}, Modes={mode_str}")
@@ -298,12 +333,18 @@ def process_file(
         "-n",
         help="LLM notes to generate: any combination of Q, W, E. Example: QWE or QW.",
     ),
+    link_calendar: bool = typer.Option(
+        False,
+        "--link-calendar",
+        help="Auto-link file to closest calendar event and rename output to YYYY-MM-DD_Title; include event metadata in notes.",
+    ),
 ):
     """
     Process a single audio file and generate meeting notes.
 
     Use --llm/--no-llm to enable/disable LLM post-processing.
     Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
+    Use --link-calendar to auto-link file to calendar event and rename output.
     """
     ctx = get_app_context()
     from app.transcriber import SUPPORTED_EXTENSIONS
@@ -343,6 +384,20 @@ def process_file(
             ctx.logger.warning("Continuing without LLM post-processing")
             effective_llm = False
 
+    # Initialize calendar linker if requested
+    calendar_linker = None
+    if link_calendar:
+        try:
+            calendar_linker = CalendarLinker(ctx.config.google, ctx.logger, select_calendar_event)
+            if select_calendar_event:
+                ctx.logger.info(f"Calendar linking enabled with manual event selection")
+            else:
+                ctx.logger.info(f"Calendar linking enabled with {ctx.config.google.match_tolerance_minutes} min tolerance")
+        except (ConfigurationError, GoogleCalendarError) as e:
+            ctx.logger.error(f"Failed to initialize calendar linker: {e}")
+            ctx.logger.warning("Continuing without calendar linking")
+            link_calendar = False
+
     # Resolve input folder
     input_folder = processor.resolve_input_folder(None)
 
@@ -369,7 +424,7 @@ def process_file(
     try:
         # Process single file
         processed_count, skipped_count = processor.run_batch(
-            [audio_path], effective_reprocess, transcriber, output_folder, llm_generator, selected_modes
+            [audio_path], effective_reprocess, transcriber, output_folder, llm_generator, selected_modes, calendar_linker
         )
 
         if skipped_count > 0:
@@ -378,6 +433,9 @@ def process_file(
             mode_str = ''.join(sorted(selected_modes)) if selected_modes else 'None'
             ctx.logger.info(f"File processed successfully, Modes={mode_str}")
 
+    except KeyboardInterrupt:
+        ctx.logger.info("Processing cancelled by user (Ctrl+C)")
+        raise typer.Exit(130)  # Standard exit code for SIGINT
     except TranscriptionError as e:
         ctx.logger.error(f"Transcription failed: {e}")
         raise typer.Exit(code=1)

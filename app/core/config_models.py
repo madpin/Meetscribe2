@@ -71,6 +71,7 @@ class GoogleConfig(BaseModel):
     default_past_days: int = 3
     max_results: int = 50
     filter_group_events_only: bool = True
+    match_tolerance_minutes: int = 90
 
     def expand(self):
         """Expand user paths to absolute paths."""

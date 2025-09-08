@@ -221,3 +221,75 @@ def format_time_ago(value) -> str:
     else:
         years = total_seconds // 31536000
         return f"{max(1, years)}y"
+
+
+def sanitize_filename(name: str, replacement: str = "_", max_length: int = 80) -> str:
+    """
+    Sanitize a string to make it safe for use as a filename component.
+
+    Args:
+        name: The original string to sanitize
+        replacement: Character to replace invalid sequences with
+        max_length: Maximum length of the resulting string
+
+    Returns:
+        Sanitized string safe for filesystem use
+    """
+    import re
+
+    if not name:
+        return "untitled"
+
+    # Trim whitespace
+    name = name.strip()
+
+    # Replace sequences of non-alphanumeric/dash/underscore/space with replacement
+    name = re.sub(r"[^a-zA-Z0-9\-_\s]", replacement, name)
+
+    # Convert spaces to replacement
+    name = name.replace(" ", replacement)
+
+    # Collapse multiple replacements to single occurrence
+    while replacement * 2 in name:
+        name = name.replace(replacement * 2, replacement)
+
+    # Strip leading/trailing replacement characters
+    name = name.strip(replacement)
+
+    # Ensure non-empty result
+    if not name:
+        return "untitled"
+
+    # Cap to max_length
+    if len(name) > max_length:
+        name = name[:max_length].rstrip(replacement)
+
+    return name
+
+
+def generate_unique_path(base: Path, stem: str, ext: str) -> Path:
+    """
+    Generate a unique file path, avoiding overwrites by adding suffixes if needed.
+
+    Args:
+        base: Base directory path
+        stem: Filename stem (without extension)
+        ext: File extension (with dot, e.g., ".txt")
+
+    Returns:
+        Unique file path that doesn't exist in the base directory
+    """
+    if not ext.startswith('.'):
+        ext = '.' + ext
+
+    candidate = base / f"{stem}{ext}"
+    if not candidate.exists():
+        return candidate
+
+    # Add suffixes like " (1)", " (2)", etc.
+    counter = 1
+    while True:
+        candidate = base / f"{stem} ({counter}){ext}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
