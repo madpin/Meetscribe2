@@ -16,24 +16,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Check template status
-      id: template_check
-      shell: bash
-      run: |
-        if grep -q "{{.*}}" pyproject.toml; then
-          echo "is_template=true" >> $GITHUB_OUTPUT
-          echo "📋 Running in TEMPLATE MODE - placeholders found"
-        else
-          echo "is_template=false" >> $GITHUB_OUTPUT
-          echo "✅ Running in INSTANTIATED MODE - no placeholders"
-        fi
-
-    - name: Skip release creation (template mode)
-      if: steps.template_check.outputs.is_template == 'true'
-      run: |
-        echo "⚠️ Skipping release creation - template placeholders still present"
-        echo "Please run template setup first before creating releases"
-        exit 1
 
     - name: Get release notes
       id: release_notes
