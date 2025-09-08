@@ -140,7 +140,7 @@ def process_directory(
         try:
             calendar_linker = CalendarLinker(ctx.config.google, ctx.logger, select_calendar_event)
             if select_calendar_event:
-                ctx.logger.info(f"Calendar linking enabled with manual event selection")
+                ctx.logger.info("Calendar linking enabled with manual event selection")
             else:
                 ctx.logger.info(f"Calendar linking enabled with {ctx.config.google.match_tolerance_minutes} min tolerance")
         except (ConfigurationError, GoogleCalendarError) as e:
@@ -338,6 +338,11 @@ def process_file(
         "--link-calendar",
         help="Auto-link file to closest calendar event and rename output to YYYY-MM-DD_Title; include event metadata in notes.",
     ),
+    select_calendar_event: bool = typer.Option(
+        False,
+        "--select-calendar-event",
+        help="When used with --link-calendar, interactively select which calendar event to link to instead of auto-matching.",
+    ),
 ):
     """
     Process a single audio file and generate meeting notes.
@@ -390,7 +395,7 @@ def process_file(
         try:
             calendar_linker = CalendarLinker(ctx.config.google, ctx.logger, select_calendar_event)
             if select_calendar_event:
-                ctx.logger.info(f"Calendar linking enabled with manual event selection")
+                ctx.logger.info("Calendar linking enabled with manual event selection")
             else:
                 ctx.logger.info(f"Calendar linking enabled with {ctx.config.google.match_tolerance_minutes} min tolerance")
         except (ConfigurationError, GoogleCalendarError) as e:
