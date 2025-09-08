@@ -30,6 +30,7 @@ def test_process_command():
             mock_config.deepgram.api_key = "test_api_key"
             mock_config.paths = MagicMock(spec=PathsConfig)
             mock_config.paths.output_folder = Path(tmpdir) / "output"
+            mock_config.paths.output_extension = "md"
             mock_config.processing = MagicMock()
             mock_config.processing.reprocess = False
             mock_config.llm = MagicMock()
