@@ -161,28 +161,13 @@ class FileProcessor:
 
             if transcription_exists and not reprocess:
                 # Smart processing: transcription exists and we're not reprocessing
-                if llm_generator and llm_modes:
-                    # Get modes for this specific file
-                    file_modes = self._get_modes_for_file(file, llm_modes)
-
-                    if file_modes:
-                        self.logger.info(f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})")
-
-                        try:
-                            existing_content = target_out.read_text()
-                            llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, reprocess)
-                            processed += 1
-                        except Exception as e:
-                            self.logger.error(f"Failed to generate LLM notes from existing transcription for {file.name}: {e}")
-                            processed += 1  # Still count as processed even if LLM fails
-                    else:
-                        self.logger.info(f"Transcription exists for {file.name} but no LLM modes specified for this file, skipping")
-                        skipped += 1
-                else:
-                    # No LLM generator or modes at all
-                    self.logger.info(f"Transcription exists for {file.name} but no LLM setup, skipping")
-                    skipped += 1
-                continue
+                handled, proc_inc, skip_inc = self._handle_existing_without_reprocess(
+                    file, target_out, target_stem, llm_generator, llm_modes, output_folder
+                )
+                if handled:
+                    processed += proc_inc
+                    skipped += skip_inc
+                    continue
             elif transcription_exists and reprocess:
                 # Reprocessing: read existing transcription and regenerate LLM notes only
                 self.logger.info(f"Reprocessing {file.name} using existing transcription, regenerating LLM notes")
@@ -386,3 +371,40 @@ class FileProcessor:
         metadata_block = calendar_linker.format_event_metadata(matched_event, file)
 
         return new_out, metadata_block, default_out
+
+    def _handle_existing_without_reprocess(self, file: Path, target_out: Path, target_stem: str, llm_generator, llm_modes, output_folder: Path) -> tuple[bool, int, int]:
+        """
+        Handle the case where transcription exists and we're not reprocessing.
+
+        Args:
+            file: The audio file being processed
+            target_out: The target output path for transcription
+            target_stem: The stem of the target output file
+            llm_generator: Optional LLM generator instance
+            llm_modes: Optional modes configuration
+            output_folder: Output folder path
+
+        Returns:
+            Tuple of (handled: bool, processed_increment: int, skipped_increment: int)
+        """
+        if llm_generator and llm_modes:
+            # Get modes for this specific file
+            file_modes = self._get_modes_for_file(file, llm_modes)
+
+            if file_modes:
+                self.logger.info(f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})")
+
+                try:
+                    existing_content = target_out.read_text()
+                    llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, False)  # reprocess=False
+                    return True, 1, 0  # handled, processed +1, skipped +0
+                except Exception as e:
+                    self.logger.error(f"Failed to generate LLM notes from existing transcription for {file.name}: {e}")
+                    return True, 1, 0  # handled, processed +1, skipped +0 (still count as processed even if LLM fails)
+            else:
+                self.logger.info(f"Transcription exists for {file.name} but no LLM modes specified for this file, skipping")
+                return True, 0, 1  # handled, processed +0, skipped +1
+        else:
+            # No LLM generator or modes at all
+            self.logger.info(f"Transcription exists for {file.name} but no LLM setup, skipping")
+            return True, 0, 1  # handled, processed +0, skipped +1

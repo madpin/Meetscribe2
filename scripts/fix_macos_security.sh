@@ -4,7 +4,7 @@
 
 set -e
 
-if [[ $# -eq 0 ]]; then
+if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <executable-file>"
     echo ""
     echo "Example:"

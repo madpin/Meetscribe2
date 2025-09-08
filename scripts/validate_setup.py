@@ -13,6 +13,7 @@ Options:
 """
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Tuple
@@ -44,6 +45,7 @@ class SetupValidator:
         self._check_project_structure()
         self._check_configuration()
         self._check_workflows()
+        self._check_local_config_not_tracked()
 
         return self._report_results()
 
@@ -152,6 +154,29 @@ class SetupValidator:
                         self.warnings.append(
                             ("GitHub repository not configured", f"Update config.toml: {repo_value}")
                         )
+
+    def _check_local_config_not_tracked(self):
+        """Check that config.local.toml is not tracked by git."""
+        print("🔒 Checking that local config is not tracked...")
+
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", "config.local.toml"],
+                capture_output=True,
+                text=True,
+                cwd=self.root_dir
+            )
+            if result.returncode == 0:
+                self.errors.append(
+                    ("Local config file is tracked by git",
+                     "config.local.toml should be added to .gitignore")
+                )
+        except subprocess.CalledProcessError:
+            # If git command fails, assume file is not tracked (which is good)
+            pass
+        except FileNotFoundError:
+            # If git is not available, skip this check
+            self.warnings.append(("Git not found", "Cannot verify config.local.toml tracking status"))
 
     def _report_results(self) -> bool:
         """Report validation results."""
