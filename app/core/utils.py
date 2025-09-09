@@ -98,7 +98,8 @@ def get_audio_duration(path: Path) -> Optional[float]:
     try:
         if path.suffix.lower() == ".wav":
             import wave
-            with wave.open(str(path), 'rb') as wav_file:
+
+            with wave.open(str(path), "rb") as wav_file:
                 frames = wav_file.getnframes()
                 rate = wav_file.getframerate()
                 return frames / rate if rate > 0 else None
@@ -106,8 +107,14 @@ def get_audio_duration(path: Path) -> Optional[float]:
             # Try mutagen for other formats (including AAC, MP3, FLAC, etc.)
             try:
                 from mutagen import File
+
                 audio = File(str(path))  # Convert Path to string for mutagen
-                if audio is not None and hasattr(audio, 'info') and hasattr(audio.info, 'length') and audio.info.length is not None:
+                if (
+                    audio is not None
+                    and hasattr(audio, "info")
+                    and hasattr(audio.info, "length")
+                    and audio.info.length is not None
+                ):
                     return float(audio.info.length)
             except ImportError:
                 # mutagen not available - try alternative approaches
@@ -130,17 +137,32 @@ def _get_duration_fallback(path: Path) -> Optional[float]:
         import subprocess
         import json
 
-        result = subprocess.run([
-            'ffprobe', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', str(path)
-        ], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
 
         if result.returncode == 0:
             data = json.loads(result.stdout)
-            duration = data.get('format', {}).get('duration')
+            duration = data.get("format", {}).get("duration")
             if duration:
                 return float(duration)
-    except (subprocess.SubprocessError, json.JSONDecodeError, FileNotFoundError, subprocess.TimeoutExpired):
+    except (
+        subprocess.SubprocessError,
+        json.JSONDecodeError,
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+    ):
         pass
 
     return None
@@ -279,8 +301,8 @@ def generate_unique_path(base: Path, stem: str, ext: str) -> Path:
     Returns:
         Unique file path that doesn't exist in the base directory
     """
-    if not ext.startswith('.'):
-        ext = '.' + ext
+    if not ext.startswith("."):
+        ext = "." + ext
 
     candidate = base / f"{stem}{ext}"
     if not candidate.exists():

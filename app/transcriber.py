@@ -19,7 +19,7 @@ MIMETYPE_BY_EXT = {
     ".wav": "audio/wav",
     ".mp3": "audio/mpeg",
     ".m4a": "audio/mp4",
-    ".aac": "audio/aac"
+    ".aac": "audio/aac",
 }
 
 
@@ -39,7 +39,6 @@ class Transcriber:
         self.cfg = cfg
         self.logger = logger
         self.client = DeepgramClient(self.cfg.api_key)
-
 
     def _get_mimetype(self, file_path: Path) -> str:
         """
@@ -211,8 +210,11 @@ class Transcriber:
                     spk = getattr(p, "speaker", "Unknown")
                     text = getattr(p, "transcript", "") or ""
                     if not text and hasattr(p, "sentences"):
-                        text = " ".join(getattr(s, "text", "") for s in p.sentences
-                                        if getattr(s, "text", ""))
+                        text = " ".join(
+                            getattr(s, "text", "")
+                            for s in p.sentences
+                            if getattr(s, "text", "")
+                        )
                     if text:
                         lines.append(f"- Speaker {spk}: {text}")
                 return "\n".join(lines) if lines else "- None"
@@ -224,8 +226,11 @@ class Transcriber:
                     word = getattr(w, "word", "")
                     if word:
                         by_spk[spk].append(word)
-                lines = [f"- Speaker {spk}: {' '.join(words)}"
-                         for spk, words in by_spk.items() if words]
+                lines = [
+                    f"- Speaker {spk}: {' '.join(words)}"
+                    for spk, words in by_spk.items()
+                    if words
+                ]
                 return "\n".join(lines) if lines else "- None"
         except Exception as e:
             self.logger.debug(f"Diarization formatting fallback: {e}")

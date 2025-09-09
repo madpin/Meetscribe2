@@ -56,7 +56,7 @@ class SetupValidator:
         placeholder_patterns = [
             r"your-username/your-repo",
             r"your-email@example\.com",
-            r"your-project-name"
+            r"your-project-name",
         ]
 
         for file_path in self.CHECK_FILES:
@@ -69,7 +69,10 @@ class SetupValidator:
                 for pattern in placeholder_patterns:
                     if re.search(pattern, content):
                         self.warnings.append(
-                            (f"Found placeholder pattern '{pattern}'", f"in {file_path}")
+                            (
+                                f"Found placeholder pattern '{pattern}'",
+                                f"in {file_path}",
+                            )
                         )
             except Exception as e:
                 self.warnings.append((f"Could not read {file_path}", str(e)))
@@ -95,10 +98,7 @@ class SetupValidator:
         """Check that GitHub workflows are properly configured."""
         print("🔄 Checking GitHub workflows...")
 
-        workflow_files = [
-            ".github/workflows/ci.yml",
-            ".github/workflows/release.yml"
-        ]
+        workflow_files = [".github/workflows/ci.yml", ".github/workflows/release.yml"]
 
         for workflow_file in workflow_files:
             workflow_path = self.root_dir / workflow_file
@@ -110,9 +110,16 @@ class SetupValidator:
                 content = workflow_path.read_text()
                 # Check for basic workflow validity
                 if "jobs:" not in content:
-                    self.errors.append(("Invalid workflow format", f"{workflow_file} missing jobs section"))
+                    self.errors.append(
+                        (
+                            "Invalid workflow format",
+                            f"{workflow_file} missing jobs section",
+                        )
+                    )
                 if "runs-on:" not in content:
-                    self.errors.append(("Invalid workflow format", f"{workflow_file} missing runs-on"))
+                    self.errors.append(
+                        ("Invalid workflow format", f"{workflow_file} missing runs-on")
+                    )
             except Exception as e:
                 self.warnings.append((f"Could not validate {workflow_file}", str(e)))
 
@@ -130,15 +137,22 @@ class SetupValidator:
                 if name_match:
                     project_name = name_match.group(1)
                     if not project_name or project_name == "":
-                        self.errors.append(("Invalid project name", "Project name cannot be empty"))
+                        self.errors.append(
+                            ("Invalid project name", "Project name cannot be empty")
+                        )
                     elif project_name in ["myapp", "your-app"]:
                         self.warnings.append(
-                            ("Generic project name detected", f"Consider customizing: {project_name}")
+                            (
+                                "Generic project name detected",
+                                f"Consider customizing: {project_name}",
+                            )
                         )
 
             # Check for version
             if "version = " not in content:
-                self.errors.append(("Missing version", "pyproject.toml should specify a version"))
+                self.errors.append(
+                    ("Missing version", "pyproject.toml should specify a version")
+                )
 
         # Check config.toml
         config_path = self.root_dir / "config.toml"
@@ -152,7 +166,10 @@ class SetupValidator:
                     repo_value = repo_match.group(1)
                     if repo_value in ["your-username/your-repo"]:
                         self.warnings.append(
-                            ("GitHub repository not configured", f"Update config.toml: {repo_value}")
+                            (
+                                "GitHub repository not configured",
+                                f"Update config.toml: {repo_value}",
+                            )
                         )
 
     def _check_local_config_not_tracked(self):
@@ -164,19 +181,23 @@ class SetupValidator:
                 ["git", "ls-files", "--error-unmatch", "config.local.toml"],
                 capture_output=True,
                 text=True,
-                cwd=self.root_dir
+                cwd=self.root_dir,
             )
             if result.returncode == 0:
                 self.errors.append(
-                    ("Local config file is tracked by git",
-                     "config.local.toml should be added to .gitignore")
+                    (
+                        "Local config file is tracked by git",
+                        "config.local.toml should be added to .gitignore",
+                    )
                 )
         except subprocess.CalledProcessError:
             # If git command fails, assume file is not tracked (which is good)
             pass
         except FileNotFoundError:
             # If git is not available, skip this check
-            self.warnings.append(("Git not found", "Cannot verify config.local.toml tracking status"))
+            self.warnings.append(
+                ("Git not found", "Cannot verify config.local.toml tracking status")
+            )
 
     def _report_results(self) -> bool:
         """Report validation results."""
@@ -226,7 +247,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Validate project setup")
-    parser.add_argument("--fix", action="store_true", help="Attempt to fix configuration issues")
+    parser.add_argument(
+        "--fix", action="store_true", help="Attempt to fix configuration issues"
+    )
     parser.add_argument("--root", default=".", help="Root directory to check")
 
     args = parser.parse_args()

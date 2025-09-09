@@ -86,11 +86,22 @@ class LLMNotesGenerator:
         Returns:
             Complete prompt string with system instructions and content
         """
-        prompt_map = {"Q": self.cfg.prompts.q, "W": self.cfg.prompts.w, "E": self.cfg.prompts.e}
+        prompt_map = {
+            "Q": self.cfg.prompts.q,
+            "W": self.cfg.prompts.w,
+            "E": self.cfg.prompts.e,
+        }
         user_prompt = prompt_map[mode]
         return f"You are an expert meeting assistant.\n\n{user_prompt}\n\nUse the meeting content below:\n---\n{content}\n---\nReturn only the notes."
 
-    def generate_for_modes(self, content: str, modes: Set[str], file_stem: str, base_output: Path, reprocess: bool) -> Dict[str, Path]:
+    def generate_for_modes(
+        self,
+        content: str,
+        modes: Set[str],
+        file_stem: str,
+        base_output: Path,
+        reprocess: bool,
+    ) -> Dict[str, Path]:
         """
         Generate LLM notes for the specified modes.
 
@@ -113,7 +124,9 @@ class LLMNotesGenerator:
                 target = folder / f"{file_stem}.{mode}{self.ext}"
 
                 if not reprocess and target.exists():
-                    self.logger.info(f"Skipping LLM {mode} for {file_stem}: {target} already exists")
+                    self.logger.info(
+                        f"Skipping LLM {mode} for {file_stem}: {target} already exists"
+                    )
                     outputs[mode] = target
                     continue
 
@@ -131,14 +144,25 @@ class LLMNotesGenerator:
                 # Provide detailed error information for debugging
                 error_type = type(e).__name__
                 error_msg = str(e)
-                self.logger.error(f"Failed to generate LLM {mode} for {file_stem}: {error_type}: {error_msg}")
+                self.logger.error(
+                    f"Failed to generate LLM {mode} for {file_stem}: {error_type}: {error_msg}"
+                )
 
                 # Log additional context for common errors
                 if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                    self.logger.error(f"Connection details: model={self.cfg.model}, base_url={self.cfg.base_url}, api_key={'***' if self.cfg.api_key else 'None'}")
-                elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
-                    self.logger.error(f"Authentication issue: api_key={'***' if self.cfg.api_key else 'None'}, base_url={self.cfg.base_url}")
+                    self.logger.error(
+                        f"Connection details: model={self.cfg.model}, base_url={self.cfg.base_url}, api_key={'***' if self.cfg.api_key else 'None'}"
+                    )
+                elif (
+                    "authentication" in error_msg.lower()
+                    or "unauthorized" in error_msg.lower()
+                ):
+                    self.logger.error(
+                        f"Authentication issue: api_key={'***' if self.cfg.api_key else 'None'}, base_url={self.cfg.base_url}"
+                    )
                 elif "model" in error_msg.lower():
-                    self.logger.error(f"Model issue: model={self.cfg.model}, available models may vary by provider")
+                    self.logger.error(
+                        f"Model issue: model={self.cfg.model}, available models may vary by provider"
+                    )
 
         return outputs

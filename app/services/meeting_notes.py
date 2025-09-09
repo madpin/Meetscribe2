@@ -33,7 +33,9 @@ class EventNotesGenerator:
         self.cfg = cfg
         self.logger = logger
 
-    def _parse_event_times(self, event: Dict[str, Any]) -> tuple[Optional[datetime], Optional[datetime]]:
+    def _parse_event_times(
+        self, event: Dict[str, Any]
+    ) -> tuple[Optional[datetime], Optional[datetime]]:
         """
         Parse event start and end times as local timezone-aware datetimes.
 
@@ -43,28 +45,32 @@ class EventNotesGenerator:
         Returns:
             Tuple of (start_datetime, end_datetime), both timezone-aware in local tz
         """
-        start_info = event.get('start', {})
-        end_info = event.get('end', {})
+        start_info = event.get("start", {})
+        end_info = event.get("end", {})
 
         # Handle all-day events
-        if 'date' in start_info:
+        if "date" in start_info:
             # All-day event
-            date_str = start_info['date']
-            start_dt = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
-            end_date_str = end_info.get('date', date_str)
-            end_dt = datetime.fromisoformat(end_date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            date_str = start_info["date"]
+            start_dt = datetime.fromisoformat(date_str).replace(
+                tzinfo=datetime.now().astimezone().tzinfo
+            )
+            end_date_str = end_info.get("date", date_str)
+            end_dt = datetime.fromisoformat(end_date_str).replace(
+                tzinfo=datetime.now().astimezone().tzinfo
+            )
             return start_dt, end_dt
 
         # Handle timed events
-        if 'dateTime' in start_info:
-            start_dt_str = start_info['dateTime']
-            end_dt_str = end_info.get('dateTime', start_dt_str)
+        if "dateTime" in start_info:
+            start_dt_str = start_info["dateTime"]
+            end_dt_str = end_info.get("dateTime", start_dt_str)
 
             # Handle Python 3.10 compatibility by replacing Z with +00:00
-            if start_dt_str.endswith('Z'):
-                start_dt_str = start_dt_str[:-1] + '+00:00'
-            if end_dt_str.endswith('Z'):
-                end_dt_str = end_dt_str[:-1] + '+00:00'
+            if start_dt_str.endswith("Z"):
+                start_dt_str = start_dt_str[:-1] + "+00:00"
+            if end_dt_str.endswith("Z"):
+                end_dt_str = end_dt_str[:-1] + "+00:00"
 
             start_dt = datetime.fromisoformat(start_dt_str)
             end_dt = datetime.fromisoformat(end_dt_str)
@@ -96,13 +102,13 @@ class EventNotesGenerator:
 
         # Build replacement values
         replacements = {
-            '{{TITLE}}': event.get('summary', 'Untitled Event'),
-            '{{WHEN}}': self._format_event_when(local_start, local_end, event),
-            '{{ATTENDEES}}': self._format_attendees(event),
-            '{{ATTACHMENTS}}': self._format_attachments(event),
-            '{{EVENT_LINK}}': event.get('htmlLink', ''),
-            '{{CALENDAR_ID}}': event.get('organizer', {}).get('email', 'primary'),
-            '{{AUTOMATIC_NOTES}}': '<!-- Add automatic notes here -->'
+            "{{TITLE}}": event.get("summary", "Untitled Event"),
+            "{{WHEN}}": self._format_event_when(local_start, local_end, event),
+            "{{ATTENDEES}}": self._format_attendees(event),
+            "{{ATTACHMENTS}}": self._format_attachments(event),
+            "{{EVENT_LINK}}": event.get("htmlLink", ""),
+            "{{CALENDAR_ID}}": event.get("organizer", {}).get("email", "primary"),
+            "{{AUTOMATIC_NOTES}}": "<!-- Add automatic notes here -->",
         }
 
         # Apply replacements
@@ -121,10 +127,12 @@ class EventNotesGenerator:
         """
         if self.cfg.template_file.exists():
             try:
-                with open(self.cfg.template_file, 'r', encoding='utf-8') as f:
+                with open(self.cfg.template_file, "r", encoding="utf-8") as f:
                     return f.read()
             except Exception as e:
-                self.logger.warning(f"Failed to read template file {self.cfg.template_file}: {e}")
+                self.logger.warning(
+                    f"Failed to read template file {self.cfg.template_file}: {e}"
+                )
                 self.logger.warning("Using built-in default template")
 
         # Simple default template
@@ -138,7 +146,12 @@ class EventNotesGenerator:
 {{AUTOMATIC_NOTES}}
 """
 
-    def _format_event_when(self, local_start: Optional[datetime], local_end: Optional[datetime], event: Dict[str, Any]) -> str:
+    def _format_event_when(
+        self,
+        local_start: Optional[datetime],
+        local_end: Optional[datetime],
+        event: Dict[str, Any],
+    ) -> str:
         """
         Format event time range for display.
 
@@ -153,12 +166,12 @@ class EventNotesGenerator:
         if not local_start:
             return "Unknown"
 
-        if event.get('start', {}).get('date'):  # All-day event
+        if event.get("start", {}).get("date"):  # All-day event
             return f"{local_start.strftime('%Y-%m-%d')} (all-day)"
         else:
-            start_str = local_start.strftime('%Y-%m-%d %H:%M')
+            start_str = local_start.strftime("%Y-%m-%d %H:%M")
             if local_end:
-                end_str = local_end.strftime('%H:%M')
+                end_str = local_end.strftime("%H:%M")
                 return f"{start_str} — {end_str}"
             else:
                 return start_str
@@ -216,7 +229,7 @@ class EventNotesGenerator:
             return "unknown_date_untitled"
 
         date_str = local_start.strftime(self.cfg.date_format)
-        title = event.get('summary', 'Untitled Event')
+        title = event.get("summary", "Untitled Event")
         sanitized_title = sanitize_filename(title)
 
         return self.cfg.filename_format.format(date=date_str, title=sanitized_title)
@@ -258,7 +271,7 @@ class EventNotesGenerator:
 
         # Write file
         try:
-            with open(target_path, 'w', encoding='utf-8') as f:
+            with open(target_path, "w", encoding="utf-8") as f:
                 f.write(content)
             self.logger.info(f"Created meeting note: {target_path}")
             return target_path

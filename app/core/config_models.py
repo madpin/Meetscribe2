@@ -12,6 +12,7 @@ from typing import List, Union, Optional
 
 class DeepgramConfig(BaseModel):
     """Deepgram API configuration."""
+
     api_key: str = Field(..., min_length=1)
     model: str = "nova-3"
     language: str = "en-US"
@@ -27,6 +28,7 @@ class DeepgramConfig(BaseModel):
 
 class PathsConfig(BaseModel):
     """File system paths configuration."""
+
     input_folder: Path = Path("~/Audio")
     output_folder: Path = Path("~/Documents/Meetscribe")
     output_extension: str = "md"
@@ -36,12 +38,15 @@ class PathsConfig(BaseModel):
         self.input_folder = self.input_folder.expanduser()
         self.output_folder = self.output_folder.expanduser()
         # Normalize output extension: remove leading dot, lowercase, default to md
-        self.output_extension = (self.output_extension or "md").strip().lstrip('.').lower() or "md"
+        self.output_extension = (self.output_extension or "md").strip().lstrip(
+            "."
+        ).lower() or "md"
         return self
 
 
 class ProcessingConfig(BaseModel):
     """Audio processing configuration."""
+
     reprocess: bool = False
     soft_limit_files: int = 10
     hard_limit_files: int = 25
@@ -49,11 +54,13 @@ class ProcessingConfig(BaseModel):
 
 class UIConfig(BaseModel):
     """User interface configuration."""
+
     selection_page_size: int = 10
 
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
+
     level: str = "INFO"
     log_file: Optional[Path] = None
     enable_file_logging: bool = True
@@ -67,6 +74,7 @@ class LoggingConfig(BaseModel):
 
 class GoogleConfig(BaseModel):
     """Google Calendar integration configuration."""
+
     credentials_file: Path = Path("~/.meetscribe/google/credentials.json")
     token_file: Path = Path("~/.meetscribe/google/token.json")
     scopes: List[str] = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -85,12 +93,14 @@ class GoogleConfig(BaseModel):
 
 class LLMPathsConfig(BaseModel):
     """LLM output folder configuration."""
+
     q_output_folder: Optional[Path] = None
     w_output_folder: Optional[Path] = None
     e_output_folder: Optional[Path] = None
 
     def expand(self, default_output: Path) -> "LLMPathsConfig":
         """Expand user paths to absolute paths, using default_output if not set."""
+
         def normalize_path(path: Optional[Path]) -> Optional[Path]:
             """Normalize path value, treating empty/whitespace strings and '.' as unset."""
             if path is None:
@@ -122,6 +132,7 @@ class LLMPathsConfig(BaseModel):
 
 class LLMPromptsConfig(BaseModel):
     """LLM prompt configuration."""
+
     q: str = "Write a clear, concise executive summary of the meeting. Include key points, decisions, risks, and next steps."
     w: str = "Provide a holistic analysis of the meeting. Summarize themes, sentiments by participants, points of alignment or tension, and overall tone."
     e: str = "Extract a precise, actionable list of tasks discussed. For each, include assignee (if known), due date (if mentioned), and concise description."
@@ -129,6 +140,7 @@ class LLMPromptsConfig(BaseModel):
 
 class LLMKeysConfig(BaseModel):
     """LLM mode key mappings."""
+
     q: str = "Q"
     w: str = "W"
     e: str = "E"
@@ -136,6 +148,7 @@ class LLMKeysConfig(BaseModel):
 
 class MeetingNotesConfig(BaseModel):
     """Meeting notes configuration."""
+
     enabled: bool = True
     template_file: Path = Path("~/.meetscribe/templates/meeting_note.md")
     output_folder: Path = Path("~/Documents/Meetscribe/Meetings")
@@ -148,12 +161,24 @@ class MeetingNotesConfig(BaseModel):
         self.template_file = self.template_file.expanduser()
         self.output_folder = self.output_folder.expanduser()
         # Normalize output extension: remove leading dot, lowercase, default to md
-        self.output_extension = (self.output_extension or "md").strip().lstrip('.').lower() or "md"
+        self.output_extension = (self.output_extension or "md").strip().lstrip(
+            "."
+        ).lower() or "md"
         return self
+
+
+class WatcherConfig(BaseModel):
+    """Directory watcher configuration."""
+
+    enabled: bool = False
+    stable_time_seconds: int = 5
+    poll_interval_seconds: float = 1.0
+    max_filesize_mb: int = 500
 
 
 class LLMConfig(BaseModel):
     """LLM post-processing configuration."""
+
     enabled: bool = True
     dialect: str = "openai"
     base_url: Optional[str] = None
@@ -168,6 +193,7 @@ class LLMConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Root configuration model."""
+
     deepgram: DeepgramConfig
     paths: PathsConfig = PathsConfig()
     processing: ProcessingConfig = ProcessingConfig()
@@ -176,3 +202,4 @@ class AppConfig(BaseModel):
     google: GoogleConfig = GoogleConfig()
     llm: LLMConfig = LLMConfig()
     meeting_notes: MeetingNotesConfig = MeetingNotesConfig()
+    watcher: WatcherConfig = WatcherConfig()

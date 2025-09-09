@@ -25,7 +25,7 @@ def interactive_select_files(
     note_keys: dict[str, str],
     initial_modes: Optional[set[str]] = None,
     llm_output_map: Optional[dict[str, Path]] = None,
-    output_extension: str = "txt"
+    output_extension: str = "txt",
 ) -> Optional[tuple[list[Path], dict[Path, set[str]]]]:
     """
     Interactive file selection with arrow keys, space bar, and per-file Q/W/E mode toggling.
@@ -46,7 +46,12 @@ def interactive_select_files(
         Supports multiple file selection with space bar and per-file mode toggling with Q/W/E keys.
         Shows tri-state indicators: ✓ processed, o queued to process, - not selected.
     """
-    from app.core.utils import format_file_size, get_audio_duration, format_duration, format_time_ago
+    from app.core.utils import (
+        format_file_size,
+        get_audio_duration,
+        format_duration,
+        format_time_ago,
+    )
     from datetime import datetime
 
     if not files:
@@ -82,7 +87,9 @@ def interactive_select_files(
     logger.debug(f"UI default_modes = {default_modes}")
     for file_path in files:
         file_modes[file_path] = default_modes.copy()
-        logger.debug(f"UI {file_path.name} initialized with modes: {file_modes[file_path]}")
+        logger.debug(
+            f"UI {file_path.name} initialized with modes: {file_modes[file_path]}"
+        )
 
     # Cache for metadata to avoid recomputing
     metadata_cache = {}
@@ -116,7 +123,10 @@ def interactive_select_files(
                 if llm_output_map:
                     mode_upper = note_keys[mode]  # e.g., 'Q', 'W', 'E'
                     if mode_upper in llm_output_map:
-                        llm_output_file = llm_output_map[mode_upper] / f"{file_path.stem}.{mode_upper}{dot_ext}"
+                        llm_output_file = (
+                            llm_output_map[mode_upper]
+                            / f"{file_path.stem}.{mode_upper}{dot_ext}"
+                        )
                         processed_modes[mode] = llm_output_file.exists()
                     else:
                         processed_modes[mode] = False
@@ -124,14 +134,14 @@ def interactive_select_files(
                     processed_modes[mode] = False
 
             metadata_cache[file_path] = {
-                'path': file_path,
-                'name': file_path.name,
-                'modified_str': modified_str,
-                'size_str': size_str,
-                'duration_str': duration_str,
-                'processed': processed,
-                'modes': modes_status,
-                'processed_modes': processed_modes
+                "path": file_path,
+                "name": file_path.name,
+                "modified_str": modified_str,
+                "size_str": size_str,
+                "duration_str": duration_str,
+                "processed": processed,
+                "modes": modes_status,
+                "processed_modes": processed_modes,
             }
 
         return metadata_cache[file_path]
@@ -168,24 +178,35 @@ def interactive_select_files(
 
             # Add rows for current page
             for i, info in enumerate(file_infos):
-                sel_marker = "*" if info['path'] in selected_paths else ""
-                processed_marker = "✓" if info['processed'] else "-"
+                sel_marker = "*" if info["path"] in selected_paths else ""
+                processed_marker = "✓" if info["processed"] else "-"
 
                 # Mode status indicators - tri-state: ✓ processed, o queued, - off
                 def get_mode_marker(mode_key: str) -> str:
-                    if info['processed_modes'].get(mode_key, False):
+                    if info["processed_modes"].get(mode_key, False):
                         return "✓"  # processed
-                    elif info['modes'].get(mode_key, False):
+                    elif info["modes"].get(mode_key, False):
                         return "o"  # queued to process
                     else:
                         return "-"  # not selected
 
-                q_marker = get_mode_marker('q')
-                w_marker = get_mode_marker('w')
-                e_marker = get_mode_marker('e')
+                q_marker = get_mode_marker("q")
+                w_marker = get_mode_marker("w")
+                e_marker = get_mode_marker("e")
 
                 style = "black on cyan" if i == current_index else None
-                table.add_row(sel_marker, processed_marker, q_marker, w_marker, e_marker, info['name'], info['modified_str'], info['size_str'], info['duration_str'], style=style)
+                table.add_row(
+                    sel_marker,
+                    processed_marker,
+                    q_marker,
+                    w_marker,
+                    e_marker,
+                    info["name"],
+                    info["modified_str"],
+                    info["size_str"],
+                    info["duration_str"],
+                    style=style,
+                )
 
             live.update(table)
             live.refresh()
@@ -193,9 +214,12 @@ def interactive_select_files(
             # Get key press
             try:
                 from readchar import readkey, key as rkey
+
                 k = readkey()
             except ImportError:
-                console.print("[red]readchar not installed. Install with: pip install readchar[/red]")
+                console.print(
+                    "[red]readchar not installed. Install with: pip install readchar[/red]"
+                )
                 return None
 
             # Handle keys
@@ -224,11 +248,16 @@ def interactive_select_files(
                     # Build result with per-file mode configurations
                     result_files = list(selected_paths)
                     # Convert lowercase modes back to uppercase for CLI compatibility
-                    result_modes = {file: {mode.upper() for mode in file_modes[file]} for file in result_files}
+                    result_modes = {
+                        file: {mode.upper() for mode in file_modes[file]}
+                        for file in result_files
+                    }
                     # Debug logging for selected files
                     for file in result_files:
                         modes = result_modes[file]
-                        logger.debug(f"UI selected: {file.name} -> modes: {''.join(sorted(modes)) if modes else 'None'}")
+                        logger.debug(
+                            f"UI selected: {file.name} -> modes: {''.join(sorted(modes)) if modes else 'None'}"
+                        )
                     return result_files, result_modes
                 else:
                     # No files explicitly selected - return the highlighted file with its current modes (may be empty)
@@ -236,7 +265,9 @@ def interactive_select_files(
                     modes = file_modes[current_file]
                     # Convert lowercase modes back to uppercase for CLI compatibility
                     uppercase_modes = {mode.upper() for mode in modes}
-                    logger.debug(f"UI current: {current_file.name} -> modes: {''.join(sorted(uppercase_modes)) if uppercase_modes else 'None'}")
+                    logger.debug(
+                        f"UI current: {current_file.name} -> modes: {''.join(sorted(uppercase_modes)) if uppercase_modes else 'None'}"
+                    )
                     return [current_file], {current_file: uppercase_modes}
             elif k in (rkey.ESC,):
                 return None
@@ -255,15 +286,26 @@ def interactive_select_files(
                             file_modes[current_file].add(mode)
                             logger.debug(f"UI added {mode} to {current_file.name}")
 
-                        logger.debug(f"UI {current_file.name} modes changed from {old_modes} to {file_modes[current_file]}")
+                        logger.debug(
+                            f"UI {current_file.name} modes changed from {old_modes} to {file_modes[current_file]}"
+                        )
 
                         # Update cache to reflect the change
                         if current_file in metadata_cache:
-                            metadata_cache[current_file]['modes'][mode] = mode in file_modes[current_file]
+                            metadata_cache[current_file]["modes"][mode] = (
+                                mode in file_modes[current_file]
+                            )
                         break
 
 
-def interactive_select_events(events: list[dict], page_size: int, logger, reload_callback=None, start_date=None, end_date=None) -> Optional[tuple[list[dict], dict]]:
+def interactive_select_events(
+    events: list[dict],
+    page_size: int,
+    logger,
+    reload_callback=None,
+    start_date=None,
+    end_date=None,
+) -> Optional[tuple[list[dict], dict]]:
     """
     Interactive event selection with arrow keys and space bar.
 
@@ -317,17 +359,17 @@ def interactive_select_events(events: list[dict], page_size: int, logger, reload
         event_id = id(event)
         if event_id not in event_cache:
             start_str = GoogleCalendarClient.parse_event_start_local(event)
-            title = event.get('summary', '-')
+            title = event.get("summary", "-")
             attendees = GoogleCalendarClient.extract_attendee_names(event)
             attendees_str = truncate_attendees(attendees)
             attachments = GoogleCalendarClient.extract_attachment_titles(event)
             attachments_str = truncate_attachments(attachments)
 
             event_cache[event_id] = {
-                'start_str': start_str,
-                'title': title,
-                'attendees_str': attendees_str,
-                'attachments_str': attachments_str
+                "start_str": start_str,
+                "title": title,
+                "attendees_str": attendees_str,
+                "attachments_str": attachments_str,
             }
 
         return event_cache[event_id]
@@ -370,7 +412,14 @@ def interactive_select_events(events: list[dict], page_size: int, logger, reload
                 global_index = start_idx + i
                 sel_marker = "*" if global_index in selected_indices else ""
                 style = "black on cyan" if i == current_index else None
-                table.add_row(sel_marker, info['start_str'], info['title'], info['attendees_str'], info['attachments_str'], style=style)
+                table.add_row(
+                    sel_marker,
+                    info["start_str"],
+                    info["title"],
+                    info["attendees_str"],
+                    info["attachments_str"],
+                    style=style,
+                )
 
             live.update(table)
             live.refresh()
@@ -378,9 +427,12 @@ def interactive_select_events(events: list[dict], page_size: int, logger, reload
             # Get key press
             try:
                 from readchar import readkey, key as rkey
+
                 k = readkey()
             except ImportError:
-                console.print("[red]readchar not installed. Install with: pip install readchar[/red]")
+                console.print(
+                    "[red]readchar not installed. Install with: pip install readchar[/red]"
+                )
                 return None
 
             # Handle keys
@@ -396,17 +448,26 @@ def interactive_select_events(events: list[dict], page_size: int, logger, reload
                 # Next page
                 current_page = (current_page + 1) % total_pages
                 current_index = 0
-            elif k.upper() == 'P' and reload_callback and current_start_date:
+            elif k.upper() == "P" and reload_callback and current_start_date:
                 # Previous day navigation
                 from datetime import timedelta
-                new_start_date = current_start_date - timedelta(days=1)
-                new_end_date = current_end_date - timedelta(days=1) if current_end_date else new_start_date + timedelta(days=1)
 
-                logger.info(f"Loading previous day: {new_start_date.strftime('%Y-%m-%d')} to {new_end_date.strftime('%Y-%m-%d')}")
+                new_start_date = current_start_date - timedelta(days=1)
+                new_end_date = (
+                    current_end_date - timedelta(days=1)
+                    if current_end_date
+                    else new_start_date + timedelta(days=1)
+                )
+
+                logger.info(
+                    f"Loading previous day: {new_start_date.strftime('%Y-%m-%d')} to {new_end_date.strftime('%Y-%m-%d')}"
+                )
 
                 # Call the reload callback
                 try:
-                    new_events, actual_start, actual_end = reload_callback(new_start_date, new_end_date)
+                    new_events, actual_start, actual_end = reload_callback(
+                        new_start_date, new_end_date
+                    )
 
                     if new_events:
                         # Update state with new events
@@ -443,19 +504,21 @@ def interactive_select_events(events: list[dict], page_size: int, logger, reload
                     selected_events = [events[i] for i in selected_indices]
                     logger.debug(f"UI selected {len(selected_events)} events")
                     date_info = {
-                        'start_date': current_start_date,
-                        'end_date': current_end_date,
-                        'navigated': navigated
+                        "start_date": current_start_date,
+                        "end_date": current_end_date,
+                        "navigated": navigated,
                     }
                     return selected_events, date_info
                 else:
                     # No events explicitly selected - return the highlighted event
                     current_event = current_page_events[current_index]
-                    logger.debug(f"UI current event: {current_event.get('summary', 'Unknown')}")
+                    logger.debug(
+                        f"UI current event: {current_event.get('summary', 'Unknown')}"
+                    )
                     date_info = {
-                        'start_date': current_start_date,
-                        'end_date': current_end_date,
-                        'navigated': navigated
+                        "start_date": current_start_date,
+                        "end_date": current_end_date,
+                        "navigated": navigated,
                     }
                     return [current_event], date_info
             elif k in (rkey.ESC,):

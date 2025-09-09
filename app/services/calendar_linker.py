@@ -26,7 +26,9 @@ class CalendarLinker:
     # Special sentinel value to indicate user cancelled selection
     USER_CANCELLED = object()
 
-    def __init__(self, gcfg: GoogleConfig, logger, select_event_interactively: bool = False):
+    def __init__(
+        self, gcfg: GoogleConfig, logger, select_event_interactively: bool = False
+    ):
         """
         Initialize the CalendarLinker with configuration and logger.
 
@@ -65,9 +67,7 @@ class CalendarLinker:
 
             # Fetch events in the window
             events = self.client.list_events_between(
-                start=window_start,
-                end=window_end,
-                limit=self.cfg.max_results
+                start=window_start, end=window_end, limit=self.cfg.max_results
             )
 
             if not events:
@@ -86,42 +86,58 @@ class CalendarLinker:
                 # Constraint: Event must start before the file modification time
                 # This ensures we're matching recordings to meetings that actually happened
                 if event_start >= mtime_local:
-                    self.logger.debug(f"Skipping event '{event.get('summary', 'Unknown')}' - starts after file modification time")
+                    self.logger.debug(
+                        f"Skipping event '{event.get('summary', 'Unknown')}' - starts after file modification time"
+                    )
                     continue
 
                 valid_events.append((event, event_start, event_end))
 
             if not valid_events:
-                self.logger.debug(f"No valid events found in window for {file_path.name}")
+                self.logger.debug(
+                    f"No valid events found in window for {file_path.name}"
+                )
                 return None
 
             # Handle interactive selection or automatic closest match
             if self.select_event_interactively:
-                self.logger.debug(f"Interactive selection enabled for {file_path.name} - {len(valid_events)} valid events found")
-                selected_event = self._interactive_event_selection(valid_events, file_path)
+                self.logger.debug(
+                    f"Interactive selection enabled for {file_path.name} - {len(valid_events)} valid events found"
+                )
+                selected_event = self._interactive_event_selection(
+                    valid_events, file_path
+                )
                 if selected_event:
                     # Annotate selected event with computed local times and distance
                     event_start, event_end = self._parse_event_times(selected_event)
-                    distance_sec = self._calculate_distance_seconds(mtime_local, event_start, event_end)
+                    distance_sec = self._calculate_distance_seconds(
+                        mtime_local, event_start, event_end
+                    )
 
-                    selected_event['_local_start'] = event_start
-                    selected_event['_local_end'] = event_end
-                    selected_event['_distance_sec'] = distance_sec
+                    selected_event["_local_start"] = event_start
+                    selected_event["_local_end"] = event_end
+                    selected_event["_distance_sec"] = distance_sec
 
-                    event_title = selected_event.get('summary', 'Unknown Event')
-                    self.logger.info(f"User selected event '{event_title}' for {file_path.name}")
+                    event_title = selected_event.get("summary", "Unknown Event")
+                    self.logger.info(
+                        f"User selected event '{event_title}' for {file_path.name}"
+                    )
                     return selected_event
                 else:
-                    self.logger.info(f"User cancelled event selection for {file_path.name}")
+                    self.logger.info(
+                        f"User cancelled event selection for {file_path.name}"
+                    )
                     return self.USER_CANCELLED
             else:
                 # Find closest event (original behavior)
                 closest_event = None
-                min_distance_sec = float('inf')
+                min_distance_sec = float("inf")
 
                 for event, event_start, event_end in valid_events:
                     # Calculate distance from file mtime to event
-                    distance_sec = self._calculate_distance_seconds(mtime_local, event_start, event_end)
+                    distance_sec = self._calculate_distance_seconds(
+                        mtime_local, event_start, event_end
+                    )
 
                     if distance_sec < min_distance_sec:
                         min_distance_sec = distance_sec
@@ -130,19 +146,27 @@ class CalendarLinker:
             # Check if closest event is within tolerance
             if closest_event:
                 # Annotate event with computed local times and distance
-                closest_event['_local_start'] = self._parse_event_times(closest_event)[0]
-                closest_event['_local_end'] = self._parse_event_times(closest_event)[1]
-                closest_event['_distance_sec'] = min_distance_sec
+                closest_event["_local_start"] = self._parse_event_times(closest_event)[
+                    0
+                ]
+                closest_event["_local_end"] = self._parse_event_times(closest_event)[1]
+                closest_event["_distance_sec"] = min_distance_sec
 
-                event_title = closest_event.get('summary', 'Unknown Event')
-                self.logger.info(f"Matched {file_path.name} to event '{event_title}' ({min_distance_sec/60:.1f} min away)")
+                event_title = closest_event.get("summary", "Unknown Event")
+                self.logger.info(
+                    f"Matched {file_path.name} to event '{event_title}' ({min_distance_sec/60:.1f} min away)"
+                )
                 return closest_event
             else:
-                self.logger.debug(f"No events within {self.cfg.match_tolerance_minutes} min tolerance for {file_path.name}")
+                self.logger.debug(
+                    f"No events within {self.cfg.match_tolerance_minutes} min tolerance for {file_path.name}"
+                )
                 return None
 
         except GoogleCalendarError as e:
-            self.logger.warning(f"Failed to match {file_path.name} to calendar event: {e}")
+            self.logger.warning(
+                f"Failed to match {file_path.name} to calendar event: {e}"
+            )
             return None
         except Exception as e:
             self.logger.warning(f"Unexpected error matching {file_path.name}: {e}")
@@ -158,12 +182,12 @@ class CalendarLinker:
         Returns:
             Filename stem in format YYYY-MM-DD_Title
         """
-        local_start = event.get('_local_start')
+        local_start = event.get("_local_start")
         if not local_start:
             return "unknown_date_untitled"
 
         date_str = local_start.strftime("%Y-%m-%d")
-        title = event.get('summary', 'Untitled Event')
+        title = event.get("summary", "Untitled Event")
         sanitized_title = sanitize_filename(title)
 
         return f"{date_str}_{sanitized_title}"
@@ -186,19 +210,19 @@ class CalendarLinker:
         lines.append("")
 
         # Title
-        title = event.get('summary', 'Untitled Event')
+        title = event.get("summary", "Untitled Event")
         lines.append(f"**Title:** {title}")
 
         # When (local times)
-        local_start = event.get('_local_start')
-        local_end = event.get('_local_end')
+        local_start = event.get("_local_start")
+        local_end = event.get("_local_end")
         if local_start:
-            if event.get('start', {}).get('date'):  # All-day event
+            if event.get("start", {}).get("date"):  # All-day event
                 when_str = f"{local_start.strftime('%Y-%m-%d')} (all-day)"
             else:
-                start_str = local_start.strftime('%Y-%m-%d %H:%M')
+                start_str = local_start.strftime("%Y-%m-%d %H:%M")
                 if local_end:
-                    end_str = local_end.strftime('%H:%M')
+                    end_str = local_end.strftime("%H:%M")
                     when_str = f"{start_str} — {end_str}"
                 else:
                     when_str = start_str
@@ -212,7 +236,9 @@ class CalendarLinker:
             if len(attendees) <= 5:
                 attendees_str = ", ".join(attendees)
             else:
-                attendees_str = ", ".join(attendees[:5]) + f" +{len(attendees) - 5} more"
+                attendees_str = (
+                    ", ".join(attendees[:5]) + f" +{len(attendees) - 5} more"
+                )
             lines.append(f"**Attendees:** {attendees_str}")
         else:
             lines.append("**Attendees:** None")
@@ -223,13 +249,15 @@ class CalendarLinker:
             if len(attachments) <= 3:
                 attachments_str = ", ".join(attachments)
             else:
-                attachments_str = ", ".join(attachments[:3]) + f" +{len(attachments) - 3} more"
+                attachments_str = (
+                    ", ".join(attachments[:3]) + f" +{len(attachments) - 3} more"
+                )
             lines.append(f"**Attachments:** {attachments_str}")
         else:
             lines.append("**Attachments:** None")
 
         # Event URL
-        html_link = event.get('htmlLink')
+        html_link = event.get("htmlLink")
         if html_link:
             lines.append(f"**Event Link:** {html_link}")
 
@@ -237,11 +265,11 @@ class CalendarLinker:
         lines.append(f"**Source Audio:** {source_file.name}")
 
         # Calendar ID
-        calendar_id = event.get('organizer', {}).get('email', 'primary')
+        calendar_id = event.get("organizer", {}).get("email", "primary")
         lines.append(f"**Calendar:** {calendar_id}")
 
         # Description (truncated)
-        description = event.get('description', '').strip()
+        description = event.get("description", "").strip()
         if description:
             if len(description) > 300:
                 description = description[:297] + "..."
@@ -251,7 +279,9 @@ class CalendarLinker:
 
         return "\n".join(lines)
 
-    def _parse_event_times(self, event: Dict[str, Any]) -> tuple[Optional[datetime], Optional[datetime]]:
+    def _parse_event_times(
+        self, event: Dict[str, Any]
+    ) -> tuple[Optional[datetime], Optional[datetime]]:
         """
         Parse event start and end times as local timezone-aware datetimes.
 
@@ -261,28 +291,32 @@ class CalendarLinker:
         Returns:
             Tuple of (start_datetime, end_datetime), both timezone-aware in local tz
         """
-        start_info = event.get('start', {})
-        end_info = event.get('end', {})
+        start_info = event.get("start", {})
+        end_info = event.get("end", {})
 
         # Handle all-day events
-        if 'date' in start_info:
+        if "date" in start_info:
             # All-day event
-            date_str = start_info['date']
-            start_dt = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
-            end_date_str = end_info.get('date', date_str)
-            end_dt = datetime.fromisoformat(end_date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            date_str = start_info["date"]
+            start_dt = datetime.fromisoformat(date_str).replace(
+                tzinfo=datetime.now().astimezone().tzinfo
+            )
+            end_date_str = end_info.get("date", date_str)
+            end_dt = datetime.fromisoformat(end_date_str).replace(
+                tzinfo=datetime.now().astimezone().tzinfo
+            )
             return start_dt, end_dt
 
         # Handle timed events
-        if 'dateTime' in start_info:
-            start_dt_str = start_info['dateTime']
-            end_dt_str = end_info.get('dateTime', start_dt_str)
+        if "dateTime" in start_info:
+            start_dt_str = start_info["dateTime"]
+            end_dt_str = end_info.get("dateTime", start_dt_str)
 
             # Handle Python 3.10 compatibility by replacing Z with +00:00
-            if start_dt_str.endswith('Z'):
-                start_dt_str = start_dt_str[:-1] + '+00:00'
-            if end_dt_str.endswith('Z'):
-                end_dt_str = end_dt_str[:-1] + '+00:00'
+            if start_dt_str.endswith("Z"):
+                start_dt_str = start_dt_str[:-1] + "+00:00"
+            if end_dt_str.endswith("Z"):
+                end_dt_str = end_dt_str[:-1] + "+00:00"
 
             start_dt = datetime.fromisoformat(start_dt_str)
             end_dt = datetime.fromisoformat(end_dt_str)
@@ -296,7 +330,9 @@ class CalendarLinker:
 
         return None, None
 
-    def _calculate_distance_seconds(self, file_time: datetime, event_start: datetime, event_end: Optional[datetime]) -> float:
+    def _calculate_distance_seconds(
+        self, file_time: datetime, event_start: datetime, event_end: Optional[datetime]
+    ) -> float:
         """
         Calculate the distance in seconds from file modification time to an event.
 
@@ -322,7 +358,9 @@ class CalendarLinker:
         else:
             return (file_time - event_start).total_seconds()
 
-    def _interactive_event_selection(self, valid_events: List[tuple], file_path: Path) -> Optional[Dict[str, Any]]:
+    def _interactive_event_selection(
+        self, valid_events: List[tuple], file_path: Path
+    ) -> Optional[Dict[str, Any]]:
         """
         Interactively prompt user to select which calendar event to link to.
 
@@ -342,8 +380,8 @@ class CalendarLinker:
         print("─" * 60)
 
         for i, (event, event_start, event_end) in enumerate(valid_events, 1):
-            title = event.get('summary', 'Untitled Event')
-            start_time = event_start.strftime('%Y-%m-%d %H:%M')
+            title = event.get("summary", "Untitled Event")
+            start_time = event_start.strftime("%Y-%m-%d %H:%M")
             attendees = self.client.extract_attendee_names(event)
             attendee_count = len(attendees)
 
@@ -361,11 +399,15 @@ class CalendarLinker:
         while True:
             try:
                 if event_count == 1:
-                    choice = input("Enter your choice (1 to link to this event, or 0 to skip): ")
+                    choice = input(
+                        "Enter your choice (1 to link to this event, or 0 to skip): "
+                    )
                 else:
-                    choice = input("Enter your choice (1-{}, or 0 to skip): ".format(event_count))
+                    choice = input(
+                        "Enter your choice (1-{}, or 0 to skip): ".format(event_count)
+                    )
 
-                if choice == '0':
+                if choice == "0":
                     return self.USER_CANCELLED
 
                 choice_num = int(choice)
@@ -379,7 +421,9 @@ class CalendarLinker:
                     if event_count == 1:
                         print("Please enter 1 to link to this event, or 0 to skip.")
                     else:
-                        print(f"Please enter a number between 1 and {event_count}, or 0 to skip.")
+                        print(
+                            f"Please enter a number between 1 and {event_count}, or 0 to skip."
+                        )
 
             except ValueError:
                 print("Please enter a valid number.")

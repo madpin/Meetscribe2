@@ -39,7 +39,7 @@ class FileProcessor:
         Returns:
             Resolved input folder path
         """
-        return (Path(arg).expanduser() if arg else self.cfg.paths.input_folder)
+        return Path(arg).expanduser() if arg else self.cfg.paths.input_folder
 
     def resolve_output_folder(self) -> Path:
         """
@@ -65,11 +65,17 @@ class FileProcessor:
         if not input_dir.is_dir():
             raise ValueError(f"Input path is not a directory: {input_dir}")
 
-        files = [p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS]
+        files = [
+            p
+            for p in input_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+        ]
         files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return files
 
-    def get_files_to_process(self, files: List[Path], reprocess: bool, output_folder: Path) -> List[Path]:
+    def get_files_to_process(
+        self, files: List[Path], reprocess: bool, output_folder: Path
+    ) -> List[Path]:
         """
         Filter files to process based on reprocess flag and existing outputs.
 
@@ -107,13 +113,24 @@ class FileProcessor:
         soft = int(self.cfg.processing.soft_limit_files)
 
         if candidate_count > hard:
-            self.logger.warning(f"Found {candidate_count} files (exceeds hard limit of {hard})")
+            self.logger.warning(
+                f"Found {candidate_count} files (exceeds hard limit of {hard})"
+            )
             return True
         if candidate_count > soft:
             return None  # Caller should prompt user
         return False
 
-    def run_batch(self, files: List[Path], reprocess: bool, transcriber: Transcriber, output_folder: Path, llm_generator=None, llm_modes=None, calendar_linker=None) -> Tuple[int, int]:
+    def run_batch(
+        self,
+        files: List[Path],
+        reprocess: bool,
+        transcriber: Transcriber,
+        output_folder: Path,
+        llm_generator=None,
+        llm_modes=None,
+        calendar_linker=None,
+    ) -> Tuple[int, int]:
         """
         Process a batch of audio files with optional LLM note generation and calendar linking.
 
@@ -136,17 +153,25 @@ class FileProcessor:
         # Debug logging for modes
         if llm_modes:
             if isinstance(llm_modes, dict):
-                self.logger.debug(f"Processing with per-file modes for {len(llm_modes)} files")
+                self.logger.debug(
+                    f"Processing with per-file modes for {len(llm_modes)} files"
+                )
             elif isinstance(llm_modes, set):
-                self.logger.debug(f"Processing with global modes: {''.join(sorted(llm_modes))}")
+                self.logger.debug(
+                    f"Processing with global modes: {''.join(sorted(llm_modes))}"
+                )
 
         for file in files:
             # Determine target output path and metadata block
-            target_out, metadata_block, original_out = self._determine_output_paths(file, output_folder, calendar_linker)
+            target_out, metadata_block, original_out = self._determine_output_paths(
+                file, output_folder, calendar_linker
+            )
 
             # If calendar linking is enabled and user cancelled selection, skip this file
             if calendar_linker and metadata_block is calendar_linker.USER_CANCELLED:
-                self.logger.info(f"Skipping {file.name} - user cancelled calendar event selection")
+                self.logger.info(
+                    f"Skipping {file.name} - user cancelled calendar event selection"
+                )
                 skipped += 1
                 continue
 
@@ -163,7 +188,12 @@ class FileProcessor:
             if transcription_exists and not reprocess:
                 # Smart processing: transcription exists and we're not reprocessing
                 handled, proc_inc, skip_inc = self._handle_existing_without_reprocess(
-                    file, target_out, target_stem, llm_generator, llm_modes, output_folder
+                    file,
+                    target_out,
+                    target_stem,
+                    llm_generator,
+                    llm_modes,
+                    output_folder,
                 )
                 if handled:
                     processed += proc_inc
@@ -171,23 +201,37 @@ class FileProcessor:
                     continue
             elif transcription_exists and reprocess:
                 # Reprocessing: read existing transcription and regenerate LLM notes only
-                self.logger.info(f"Reprocessing {file.name} using existing transcription, regenerating LLM notes")
+                self.logger.info(
+                    f"Reprocessing {file.name} using existing transcription, regenerating LLM notes"
+                )
 
                 try:
                     # Read existing transcription
                     existing_content = target_out.read_text()
-                    self.logger.info(f"Loaded existing transcription for {file.name} ({len(existing_content)} chars)")
+                    self.logger.info(
+                        f"Loaded existing transcription for {file.name} ({len(existing_content)} chars)"
+                    )
 
                     # Generate LLM notes if requested
                     if llm_generator and llm_modes:
                         file_modes = self._get_modes_for_file(file, llm_modes)
                         if file_modes:
-                            llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(
+                                existing_content,
+                                file_modes,
+                                target_stem,
+                                output_folder,
+                                reprocess,
+                            )
                             self.logger.info(f"LLM notes regenerated for {file.name}")
                         else:
-                            self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                            self.logger.info(
+                                f"No LLM modes specified for {file.name}, skipping LLM generation"
+                            )
                     else:
-                        self.logger.info(f"No LLM setup for {file.name}, skipping LLM generation")
+                        self.logger.info(
+                            f"No LLM setup for {file.name}, skipping LLM generation"
+                        )
 
                     processed += 1
 
@@ -199,13 +243,22 @@ class FileProcessor:
 
             # Handle migration from old naming to new naming
             migrated = False
-            if not transcription_exists and original_out and original_out.exists() and not reprocess:
-                self.logger.info(f"Migrating existing transcription from {original_out.name} to {target_out.name}")
+            if (
+                not transcription_exists
+                and original_out
+                and original_out.exists()
+                and not reprocess
+            ):
+                self.logger.info(
+                    f"Migrating existing transcription from {original_out.name} to {target_out.name}"
+                )
                 try:
                     existing_content = original_out.read_text()
 
                     # Prepend metadata block if calendar linking was successful
-                    if metadata_block and not existing_content.startswith("## Linked Calendar Event"):
+                    if metadata_block and not existing_content.startswith(
+                        "## Linked Calendar Event"
+                    ):
                         full_content = metadata_block + "\n\n" + existing_content
                     else:
                         full_content = existing_content
@@ -218,14 +271,28 @@ class FileProcessor:
                     if llm_generator and llm_modes:
                         try:
                             file_modes = self._get_modes_for_file(file, llm_modes)
-                            self.logger.debug(f"Generating LLM for {file.name} with modes: {file_modes}")
+                            self.logger.debug(
+                                f"Generating LLM for {file.name} with modes: {file_modes}"
+                            )
                             if file_modes:
-                                llm_generator.generate_for_modes(full_content, file_modes, target_stem, output_folder, reprocess)
-                                self.logger.info(f"LLM notes generated for migrated {file.name}")
+                                llm_generator.generate_for_modes(
+                                    full_content,
+                                    file_modes,
+                                    target_stem,
+                                    output_folder,
+                                    reprocess,
+                                )
+                                self.logger.info(
+                                    f"LLM notes generated for migrated {file.name}"
+                                )
                             else:
-                                self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                                self.logger.info(
+                                    f"No LLM modes specified for {file.name}, skipping LLM generation"
+                                )
                         except Exception as e:
-                            self.logger.error(f"Failed to generate LLM notes for migrated {file.name}: {e}")
+                            self.logger.error(
+                                f"Failed to generate LLM notes for migrated {file.name}: {e}"
+                            )
 
                     processed += 1
                     migrated = True
@@ -256,14 +323,26 @@ class FileProcessor:
                     try:
                         # Get modes for this specific file
                         file_modes = self._get_modes_for_file(file, llm_modes)
-                        self.logger.debug(f"Generating LLM for {file.name} with modes: {file_modes}")
+                        self.logger.debug(
+                            f"Generating LLM for {file.name} with modes: {file_modes}"
+                        )
                         if file_modes:
-                            llm_generator.generate_for_modes(full_notes, file_modes, target_stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(
+                                full_notes,
+                                file_modes,
+                                target_stem,
+                                output_folder,
+                                reprocess,
+                            )
                             self.logger.info(f"LLM notes generated for {file.name}")
                         else:
-                            self.logger.info(f"No LLM modes specified for {file.name}, skipping LLM generation")
+                            self.logger.info(
+                                f"No LLM modes specified for {file.name}, skipping LLM generation"
+                            )
                     except Exception as e:
-                        self.logger.error(f"Failed to generate LLM notes for {file.name}: {e}")
+                        self.logger.error(
+                            f"Failed to generate LLM notes for {file.name}: {e}"
+                        )
 
                 processed += 1
             except Exception as e:
@@ -285,9 +364,17 @@ class FileProcessor:
                         # Get modes for this specific file
                         file_modes = self._get_modes_for_file(file, llm_modes)
                         if file_modes:
-                            llm_generator.generate_for_modes(full_notes, file_modes, target_stem, output_folder, reprocess)
+                            llm_generator.generate_for_modes(
+                                full_notes,
+                                file_modes,
+                                target_stem,
+                                output_folder,
+                                reprocess,
+                            )
                     except Exception as llm_error:
-                        self.logger.error(f"Failed to generate LLM notes for error case {file.name}: {llm_error}")
+                        self.logger.error(
+                            f"Failed to generate LLM notes for error case {file.name}: {llm_error}"
+                        )
 
                 processed += 1  # Still count as processed (error file created)
 
@@ -311,18 +398,24 @@ class FileProcessor:
         if isinstance(llm_modes, dict):
             # First try exact match
             if file in llm_modes:
-                self.logger.debug(f"Found exact match for {file.name} with modes: {''.join(sorted(llm_modes[file]))}")
+                self.logger.debug(
+                    f"Found exact match for {file.name} with modes: {''.join(sorted(llm_modes[file]))}"
+                )
                 return llm_modes[file]
 
             # Try to find by filename match (more robust)
             file_name = file.name
             for dict_file, modes in llm_modes.items():
                 if dict_file.name == file_name:
-                    self.logger.debug(f"Found filename match for {file_name} with modes: {''.join(sorted(modes))}")
+                    self.logger.debug(
+                        f"Found filename match for {file_name} with modes: {''.join(sorted(modes))}"
+                    )
                     return modes
 
             # If still not found, log the issue
-            self.logger.debug(f"No modes found for {file_name}. Available files: {[f.name for f in llm_modes.keys()]}")
+            self.logger.debug(
+                f"No modes found for {file_name}. Available files: {[f.name for f in llm_modes.keys()]}"
+            )
             return set()
 
         # Handle global modes (set format) for backward compatibility
@@ -332,7 +425,9 @@ class FileProcessor:
         # Fallback
         return set()
 
-    def _determine_output_paths(self, file: Path, output_folder: Path, calendar_linker) -> Tuple[Path, Optional[str], Optional[Path]]:
+    def _determine_output_paths(
+        self, file: Path, output_folder: Path, calendar_linker
+    ) -> Tuple[Path, Optional[str], Optional[Path]]:
         """
         Determine the output paths and metadata block for a file.
 
@@ -374,7 +469,15 @@ class FileProcessor:
 
         return new_out, metadata_block, default_out
 
-    def _handle_existing_without_reprocess(self, file: Path, target_out: Path, target_stem: str, llm_generator, llm_modes, output_folder: Path) -> tuple[bool, int, int]:
+    def _handle_existing_without_reprocess(
+        self,
+        file: Path,
+        target_out: Path,
+        target_stem: str,
+        llm_generator,
+        llm_modes,
+        output_folder: Path,
+    ) -> tuple[bool, int, int]:
         """
         Handle the case where transcription exists and we're not reprocessing.
 
@@ -394,19 +497,33 @@ class FileProcessor:
             file_modes = self._get_modes_for_file(file, llm_modes)
 
             if file_modes:
-                self.logger.info(f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})")
+                self.logger.info(
+                    f"Transcription exists for {file.name}, generating LLM notes from existing content (modes: {''.join(sorted(file_modes))})"
+                )
 
                 try:
                     existing_content = target_out.read_text()
-                    llm_generator.generate_for_modes(existing_content, file_modes, target_stem, output_folder, False)  # reprocess=False
+                    llm_generator.generate_for_modes(
+                        existing_content, file_modes, target_stem, output_folder, False
+                    )  # reprocess=False
                     return True, 1, 0  # handled, processed +1, skipped +0
                 except Exception as e:
-                    self.logger.error(f"Failed to generate LLM notes from existing transcription for {file.name}: {e}")
-                    return True, 1, 0  # handled, processed +1, skipped +0 (still count as processed even if LLM fails)
+                    self.logger.error(
+                        f"Failed to generate LLM notes from existing transcription for {file.name}: {e}"
+                    )
+                    return (
+                        True,
+                        1,
+                        0,
+                    )  # handled, processed +1, skipped +0 (still count as processed even if LLM fails)
             else:
-                self.logger.info(f"Transcription exists for {file.name} but no LLM modes specified for this file, skipping")
+                self.logger.info(
+                    f"Transcription exists for {file.name} but no LLM modes specified for this file, skipping"
+                )
                 return True, 0, 1  # handled, processed +0, skipped +1
         else:
             # No LLM generator or modes at all
-            self.logger.info(f"Transcription exists for {file.name} but no LLM setup, skipping")
+            self.logger.info(
+                f"Transcription exists for {file.name} but no LLM setup, skipping"
+            )
             return True, 0, 1  # handled, processed +0, skipped +1

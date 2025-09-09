@@ -44,7 +44,9 @@ output_folder = "~/Documents/Meetscribe"
             config = load_config()
 
             assert config.deepgram.api_key == "test_key"
-            assert str(config.paths.output_folder) == os.path.join(HOME_DIR, "Documents", "Meetscribe")
+            assert str(config.paths.output_folder) == os.path.join(
+                HOME_DIR, "Documents", "Meetscribe"
+            )
         finally:
             os.chdir(original_cwd)
 
@@ -77,7 +79,9 @@ api_key = "local_key"
             # Should have overridden values
             assert config.deepgram.api_key == "local_key"
             # Should preserve non-overridden values
-            assert str(config.paths.output_folder) == os.path.join(HOME_DIR, "Documents", "Meetscribe")
+            assert str(config.paths.output_folder) == os.path.join(
+                HOME_DIR, "Documents", "Meetscribe"
+            )
         finally:
             os.chdir(original_cwd)
 

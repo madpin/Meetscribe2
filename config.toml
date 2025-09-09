@@ -94,3 +94,10 @@ output_folder = "~/Documents/Meetscribe/Meetings"
 output_extension = "md"
 filename_format = "{date}_{title}"
 date_format = "%Y-%m-%d"
+
+[watcher]
+# Directory watcher configuration
+enabled = false
+stable_time_seconds = 5
+poll_interval_seconds = 1.0
+max_filesize_mb = 500

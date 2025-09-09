@@ -37,7 +37,11 @@ def test_process_command():
             mock_config.llm.enabled = True
             mock_config.llm.default_modes = ""
             mock_config.llm.keys = MagicMock()
-            mock_config.llm.keys.model_dump.return_value = {"q": "Q", "w": "W", "e": "E"}
+            mock_config.llm.keys.model_dump.return_value = {
+                "q": "Q",
+                "w": "W",
+                "e": "E",
+            }
             mock_config.llm.paths = MagicMock()
             mock_config.llm.paths.q_output_folder = Path(tmpdir) / "output"
             mock_config.llm.paths.w_output_folder = Path(tmpdir) / "output"
@@ -49,7 +53,6 @@ def test_process_command():
 
             with patch("app.cli.get_app_context", return_value=mock_ctx):
                 result = runner.invoke(app, ["process", "dir", tmpdir])
-
 
                 assert result.exit_code == 0
                 # The CLI command succeeds, which means it found and processed files

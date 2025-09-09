@@ -48,9 +48,6 @@ class AppContext:
         if log_file:
             log_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self.logger = setup_logging(
-            level=self.config.logging.level,
-            log_file=log_file
-        )
+        self.logger = setup_logging(level=self.config.logging.level, log_file=log_file)
 
         self.logger.info("Configuration loaded successfully")
