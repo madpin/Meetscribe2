@@ -6,9 +6,11 @@ automatically convert audio recordings of meetings into structured notes.
 """
 
 import sys
+from pathlib import Path
 from typing import Optional
 
 import typer
+from typer import Option
 from rich.table import Table
 from rich.console import Console
 
@@ -24,8 +26,9 @@ from app.services.llm_notes import LLMNotesGenerator
 from app.services.calendar_linker import CalendarLinker
 from app.services.meeting_notes import EventNotesGenerator
 from app.services.dir_watcher import DirectoryWatcher
+from app.services.audio_tools import remove_silence
 from app.ui import interactive_select_files, interactive_select_events
-from app.transcriber import Transcriber
+from app.transcriber import Transcriber, SUPPORTED_EXTENSIONS
 from app.integrations.google_calendar import GoogleCalendarClient
 
 # Global AppContext instance - will be initialized on first use
@@ -55,6 +58,9 @@ app = typer.Typer(
 
 process_app = typer.Typer(name="process", help="Process audio files.")
 app.add_typer(process_app)
+
+audio_app = typer.Typer(name="audio", help="Audio utilities.")
+app.add_typer(audio_app)
 
 calendar_app = typer.Typer(name="calendar", help="Google Calendar commands.")
 app.add_typer(calendar_app)
@@ -96,6 +102,26 @@ def process_directory(
         False,
         "--select-calendar-event",
         help="When used with --link-calendar, interactively select which calendar event to link to instead of auto-matching.",
+    ),
+    trim_silence: bool = typer.Option(
+        False,
+        "--trim-silence",
+        help="Preprocess audio by removing silence before transcription.",
+    ),
+    min_silence_len: int = typer.Option(
+        1000,
+        "--min-silence-len",
+        help="Minimum length of silence to detect (milliseconds).",
+    ),
+    silence_thresh: int = typer.Option(
+        -40,
+        "--silence-thresh",
+        help="Silence threshold in dBFS.",
+    ),
+    keep_silence: int = typer.Option(
+        100,
+        "--keep-silence",
+        help="Amount of silence to keep around detected segments (milliseconds).",
     ),
 ):
     """
@@ -265,6 +291,10 @@ def process_directory(
                 llm_generator,
                 file_modes_dict,
                 calendar_linker,
+                trim_silence=trim_silence,
+                min_silence_len=min_silence_len,
+                silence_thresh=silence_thresh,
+                keep_silence=keep_silence,
             )
         except KeyboardInterrupt:
             ctx.logger.info("Processing cancelled by user (Ctrl+C)")
@@ -297,6 +327,10 @@ def process_directory(
                 llm_generator,
                 selected_modes,
                 calendar_linker,
+                trim_silence=trim_silence,
+                min_silence_len=min_silence_len,
+                silence_thresh=silence_thresh,
+                keep_silence=keep_silence,
             )
         except KeyboardInterrupt:
             ctx.logger.info("Processing cancelled by user (Ctrl+C)")
@@ -399,6 +433,26 @@ def process_file(
         False,
         "--select-calendar-event",
         help="When used with --link-calendar, interactively select which calendar event to link to instead of auto-matching.",
+    ),
+    trim_silence: bool = typer.Option(
+        False,
+        "--trim-silence",
+        help="Preprocess audio by removing silence before transcription.",
+    ),
+    min_silence_len: int = typer.Option(
+        1000,
+        "--min-silence-len",
+        help="Minimum length of silence to detect (milliseconds).",
+    ),
+    silence_thresh: int = typer.Option(
+        -40,
+        "--silence-thresh",
+        help="Silence threshold in dBFS.",
+    ),
+    keep_silence: int = typer.Option(
+        100,
+        "--keep-silence",
+        help="Amount of silence to keep around detected segments (milliseconds).",
     ),
 ):
     """
@@ -508,6 +562,10 @@ def process_file(
             llm_generator,
             selected_modes,
             calendar_linker,
+            trim_silence=trim_silence,
+            min_silence_len=min_silence_len,
+            silence_thresh=silence_thresh,
+            keep_silence=keep_silence,
         )
 
         if skipped_count > 0:
@@ -570,6 +628,26 @@ def process_watch(
         None,
         "--max-size-mb",
         help="Maximum file size in MB to process (defaults to config).",
+    ),
+    trim_silence: bool = typer.Option(
+        False,
+        "--trim-silence",
+        help="Preprocess audio by removing silence before transcription.",
+    ),
+    min_silence_len: int = typer.Option(
+        1000,
+        "--min-silence-len",
+        help="Minimum length of silence to detect (milliseconds).",
+    ),
+    silence_thresh: int = typer.Option(
+        -40,
+        "--silence-thresh",
+        help="Silence threshold in dBFS.",
+    ),
+    keep_silence: int = typer.Option(
+        100,
+        "--keep-silence",
+        help="Amount of silence to keep around detected segments (milliseconds).",
     ),
 ):
     """
@@ -676,6 +754,10 @@ def process_watch(
             llm_modes=selected_modes,
             calendar_linker=calendar_linker,
             reprocess=effective_reprocess,
+            trim_silence=trim_silence,
+            min_silence_len=min_silence_len,
+            silence_thresh=silence_thresh,
+            keep_silence=keep_silence,
         )
     except KeyboardInterrupt:
         ctx.logger.info("Watcher stopped by user (Ctrl+C)")
@@ -955,6 +1037,93 @@ def calendar_upcoming(
         ctx.logger.error(f"Failed to list upcoming calendar events: {e}")
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1)
+
+
+@audio_app.command("trim-silence")
+def audio_trim_silence(
+    path: str = typer.Argument(..., help="Path to audio file or directory containing audio files"),
+    out_dir: Optional[str] = Option(None, "--out-dir", help="Output directory for processed files (defaults to alongside input files with .nosil suffix)"),
+    min_silence_len: int = Option(1000, "--min-silence-len", help="Minimum length of silence to detect (milliseconds)"),
+    silence_thresh: int = Option(-40, "--silence-thresh", help="Silence threshold in dBFS"),
+    keep_silence: int = Option(100, "--keep-silence", help="Amount of silence to keep around detected segments (milliseconds)"),
+):
+    """
+    Remove silence from audio files using PyDub.
+
+    Processes all supported audio files in the given path. If path is a file, processes that file.
+    If path is a directory, processes all supported audio files in that directory.
+
+    Supported formats: wav, mp3, m4a, aac
+
+    Output files will have the same extension as input files. AAC files are exported as ADTS format.
+    """
+    ctx = get_app_context()
+
+    # Resolve input path
+    input_path = Path(path).expanduser().resolve()
+
+    if not input_path.exists():
+        ctx.logger.error(f"Path does not exist: {input_path}")
+        raise typer.Exit(code=1)
+
+    # Determine output directory
+    if out_dir:
+        output_dir = Path(out_dir).expanduser().resolve()
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = None  # Will use alongside input files
+
+    # Collect files to process
+    files_to_process = []
+    if input_path.is_file():
+        if input_path.suffix.lower() in SUPPORTED_EXTENSIONS:
+            files_to_process = [input_path]
+        else:
+            ctx.logger.error(f"Unsupported file extension: {input_path.suffix}. Supported: {', '.join(SUPPORTED_EXTENSIONS)}")
+            raise typer.Exit(code=1)
+    elif input_path.is_dir():
+        for file_path in input_path.iterdir():
+            if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                files_to_process.append(file_path)
+        if not files_to_process:
+            ctx.logger.warning(f"No supported audio files found in {input_path}")
+            return
+    else:
+        ctx.logger.error(f"Path is neither a file nor directory: {input_path}")
+        raise typer.Exit(code=1)
+
+    # Process files
+    processed_count = 0
+    for file_path in files_to_process:
+        try:
+            # Determine output path
+            if output_dir:
+                output_path = output_dir / file_path.name
+            else:
+                # Add .nosil suffix before extension
+                stem = file_path.stem
+                suffix = file_path.suffix
+                output_path = file_path.parent / f"{stem}.nosil{suffix}"
+
+            ctx.logger.info(f"Processing {file_path.name} -> {output_path.name}")
+
+            # Remove silence
+            result_path = remove_silence(
+                input_path=file_path,
+                output_path=output_path,
+                min_silence_len=min_silence_len,
+                silence_thresh=silence_thresh,
+                keep_silence=keep_silence,
+            )
+
+            ctx.logger.info(f"Successfully processed: {result_path}")
+            processed_count += 1
+
+        except Exception as e:
+            ctx.logger.error(f"Failed to process {file_path.name}: {e}")
+
+    # Summary
+    ctx.logger.info(f"Processed {processed_count}/{len(files_to_process)} files successfully")
 
 
 if __name__ == "__main__":

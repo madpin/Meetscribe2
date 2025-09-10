@@ -7,10 +7,12 @@ audio files, including batch operations and output file management.
 
 from pathlib import Path
 from typing import List, Optional, Tuple
+import tempfile
 
 from app.core.config_models import AppConfig
 from app.core.utils import ensure_directory_exists, generate_unique_path
 from app.transcriber import SUPPORTED_EXTENSIONS, Transcriber
+from app.services.audio_tools import remove_silence
 
 
 class FileProcessor:
@@ -130,6 +132,10 @@ class FileProcessor:
         llm_generator=None,
         llm_modes=None,
         calendar_linker=None,
+        trim_silence: bool = False,
+        min_silence_len: int = 1000,
+        silence_thresh: int = -40,
+        keep_silence: int = 100,
     ) -> Tuple[int, int]:
         """
         Process a batch of audio files with optional LLM note generation and calendar linking.
@@ -306,7 +312,20 @@ class FileProcessor:
 
             # Transcription doesn't exist, process the file normally
             try:
-                notes = transcriber.process_audio_file(file)
+                # Preprocess audio if silence trimming is enabled
+                src_path, temp_path = self._preprocess_audio(file, trim_silence, min_silence_len, silence_thresh, keep_silence)
+
+                # Process the audio file (original or preprocessed)
+                try:
+                    notes = transcriber.process_audio_file(src_path)
+                finally:
+                    # Clean up temporary file if it was created
+                    if temp_path and temp_path.exists():
+                        try:
+                            temp_path.unlink()
+                            self.logger.debug(f"Cleaned up temporary file: {temp_path}")
+                        except Exception as cleanup_error:
+                            self.logger.warning(f"Failed to clean up temporary file {temp_path}: {cleanup_error}")
 
                 # Prepend metadata block if calendar linking was successful
                 if metadata_block:
@@ -527,3 +546,40 @@ class FileProcessor:
                 f"Transcription exists for {file.name} but no LLM setup, skipping"
             )
             return True, 0, 1  # handled, processed +0, skipped +1
+
+    def _preprocess_audio(self, file: Path, trim_silence: bool, min_silence_len: int, silence_thresh: int, keep_silence: int) -> tuple[Path, Optional[Path]]:
+        """
+        Preprocess audio file by removing silence if enabled.
+
+        Args:
+            file: Input audio file path
+            trim_silence: Whether to trim silence
+            min_silence_len: Minimum silence length in milliseconds
+            silence_thresh: Silence threshold in dBFS
+            keep_silence: Amount of silence to keep around segments in milliseconds
+
+        Returns:
+            Tuple of (source_path, temp_path) where source_path is the file to use for transcription
+            and temp_path is the temporary file to clean up (or None if no preprocessing)
+        """
+        if not trim_silence:
+            return file, None
+
+        # Create temporary file path
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = temp_dir / f"{file.stem}.nosil{file.suffix}"
+
+        try:
+            self.logger.debug(f"Preprocessing {file.name} -> removing silence")
+            remove_silence(
+                input_path=file,
+                output_path=temp_path,
+                min_silence_len=min_silence_len,
+                silence_thresh=silence_thresh,
+                keep_silence=keep_silence,
+            )
+            self.logger.debug(f"Silence removal completed: {temp_path}")
+            return temp_path, temp_path
+        except Exception as e:
+            self.logger.warning(f"Failed to preprocess {file.name}: {e}. Using original file.")
+            return file, None

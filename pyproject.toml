@@ -32,6 +32,7 @@ dependencies = [
     "google-auth-oauthlib",
     "langchain",
     "langchain-openai",
+    "pydub",
 ]
 
 [project.optional-dependencies]

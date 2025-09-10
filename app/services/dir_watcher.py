@@ -37,6 +37,11 @@ class DirectoryWatcher:
             ]
         except FileNotFoundError:
             return []
+        except (InterruptedError, OSError) as e:
+            # Handle interrupted system calls (e.g., from Ctrl+C) and other OS errors
+            # These are typically transient, so we'll log and return empty list
+            self.logger.warning(f"System call interrupted while listing files in {folder}: {e}")
+            return []
 
     def _update_size_state(self, path: Path, size: int, now_mono: float) -> float:
         prev = self._size_state.get(path)
@@ -71,6 +76,10 @@ class DirectoryWatcher:
         llm_modes=None,
         calendar_linker=None,
         reprocess: Optional[bool] = None,
+        trim_silence: bool = False,
+        min_silence_len: int = 1000,
+        silence_thresh: int = -40,
+        keep_silence: int = 100,
     ) -> None:
         if not input_dir.is_dir():
             raise ValueError(f"Input path is not a directory: {input_dir}")
@@ -135,7 +144,11 @@ class DirectoryWatcher:
                         self.logger.info(f"Detected stable file: {path.name} ({size/1024/1024:.1f} MB) - starting processing")
                         processed_count, skipped_count = processor.run_batch(
                             [path], effective_reprocess, transcriber, output_folder,
-                            llm_generator, llm_modes, calendar_linker
+                            llm_generator, llm_modes, calendar_linker,
+                            trim_silence=trim_silence,
+                            min_silence_len=min_silence_len,
+                            silence_thresh=silence_thresh,
+                            keep_silence=keep_silence,
                         )
                         # Mark as processed regardless of processed/skipped to avoid repeated attempts
                         self._processed.add(path)
