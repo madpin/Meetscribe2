@@ -2,6 +2,7 @@
 Application Context for managing shared state and dependencies.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -14,11 +15,12 @@ from .config_models import AppConfig
 class AppContext:
     """
     Central application context that manages typed configuration and logging.
+    Uses lazy initialization to improve startup performance.
     """
 
     def __init__(self, config_path: Optional[Path] = None):
         """
-        Initialize the application context.
+        Initialize the application context with lazy loading.
 
         Args:
             config_path: Optional path to configuration file (defaults to config.toml)
@@ -27,27 +29,40 @@ class AppContext:
             ConfigurationError: If configuration cannot be loaded
         """
         self.config_path = config_path or Path("config.toml")
+        self._config: Optional[AppConfig] = None
+        self._logger: Optional[logging.Logger] = None
 
-        # Load typed configuration first (minimal config for logging)
-        try:
-            self.config: AppConfig = load_config(self.config_path)
-        except Exception as e:
-            # If config loading fails, use default logging config
-            print(f"Failed to load configuration: {e}")
-            raise ConfigurationError(str(e))
+    @property
+    def config(self) -> AppConfig:
+        """Lazily load and return configuration."""
+        if self._config is None:
+            try:
+                self._config = load_config(self.config_path)
+            except Exception as e:
+                print(f"Failed to load configuration: {e}")
+                raise ConfigurationError(str(e))
+        return self._config
 
-        # Setup logging using configuration
-        log_file = None
-        if self.config.logging.enable_file_logging:
-            if self.config.logging.log_file:
-                log_file = self.config.logging.log_file
-            else:
-                # Default log file if not specified
-                log_file = Path.home() / ".meetscribe" / "meetscribe.log"
+    @property
+    def logger(self) -> logging.Logger:
+        """Lazily setup and return logger."""
+        if self._logger is None:
+            # Ensure config is loaded first
+            config = self.config
 
-        if log_file:
-            log_file.parent.mkdir(parents=True, exist_ok=True)
+            # Setup logging using configuration
+            log_file = None
+            if config.logging.enable_file_logging:
+                if config.logging.log_file:
+                    log_file = config.logging.log_file
+                else:
+                    # Default log file if not specified
+                    log_file = Path.home() / ".meetscribe" / "meetscribe.log"
 
-        self.logger = setup_logging(level=self.config.logging.level, log_file=log_file)
+            if log_file:
+                log_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self.logger.info("Configuration loaded successfully")
+            self._logger = setup_logging(level=config.logging.level, log_file=log_file)
+            self._logger.info("Configuration loaded successfully")
+
+        return self._logger

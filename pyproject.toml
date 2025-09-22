@@ -46,7 +46,7 @@ dev = [
 ]
 
 [project.scripts]
-meetscribe = "app.cli:app"
+meetscribe = "app.cli:main"
 
 [tool.setuptools]
 packages = ["app"]

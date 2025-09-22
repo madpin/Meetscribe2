@@ -20,19 +20,14 @@ from app.core.exceptions import (
     TranscriptionError,
     GoogleCalendarError,
 )
-from app.core.utils import truncate_attendees, truncate_attachments
-from app.services.file_processor import FileProcessor
-from app.services.llm_notes import LLMNotesGenerator
-from app.services.calendar_linker import CalendarLinker
-from app.services.meeting_notes import EventNotesGenerator
-from app.services.dir_watcher import DirectoryWatcher
-from app.services.audio_tools import remove_silence
-from app.ui import interactive_select_files, interactive_select_events
-from app.transcriber import Transcriber, SUPPORTED_EXTENSIONS
-from app.integrations.google_calendar import GoogleCalendarClient
 
 # Global AppContext instance - will be initialized on first use
 _app_context: Optional[AppContext] = None
+
+
+def is_help_command() -> bool:
+    """Check if the current command is a help-related command that doesn't need AppContext."""
+    return any(arg in sys.argv for arg in ['--help', '-h', '--install-completion', '--show-completion'])
 
 
 def get_app_context() -> AppContext:
@@ -133,6 +128,17 @@ def process_directory(
     Use --link-calendar to auto-link files to calendar events and rename outputs.
     Use --select-calendar-event with --link-calendar for interactive event selection.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.services.file_processor import FileProcessor
+    from app.transcriber import Transcriber
+    from app.services.llm_notes import LLMNotesGenerator
+    from app.services.calendar_linker import CalendarLinker
+    from app.ui import interactive_select_files
+    
     ctx = get_app_context()
 
     # Initialize services
@@ -352,7 +358,12 @@ def process_list(
     """
     List all supported audio files in a directory with metadata.
     """
-    ctx = get_app_context()
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.services.file_processor import FileProcessor
     from app.core.utils import (
         format_file_size,
         get_audio_duration,
@@ -360,7 +371,8 @@ def process_list(
         format_time_ago,
     )
     from datetime import datetime
-
+    
+    ctx = get_app_context()
     console = Console()
 
     # Initialize processor
@@ -462,8 +474,17 @@ def process_file(
     Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
     Use --link-calendar to auto-link file to calendar event and rename output.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.services.file_processor import FileProcessor
+    from app.transcriber import Transcriber, SUPPORTED_EXTENSIONS
+    from app.services.llm_notes import LLMNotesGenerator
+    from app.services.calendar_linker import CalendarLinker
+    
     ctx = get_app_context()
-    from app.transcriber import SUPPORTED_EXTENSIONS
 
     if audio_file is None:
         ctx.logger.error(
@@ -670,6 +691,18 @@ def process_watch(
     Use --max-size-mb to override the maximum file size limit (defaults to 500 MB).
     Use Ctrl+C to stop the watcher.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time  
+    from app.services.file_processor import FileProcessor
+    from app.transcriber import Transcriber
+    from app.services.llm_notes import LLMNotesGenerator
+    from app.services.calendar_linker import CalendarLinker
+    from app.services.dir_watcher import DirectoryWatcher
+    from app.ui import interactive_select_files
+    
     ctx = get_app_context()
 
     # Initialize services
@@ -746,8 +779,6 @@ def process_watch(
     )
     
     if unprocessed_files:
-        from app.ui import interactive_select_files
-        
         ctx.logger.info(f"Found {len(unprocessed_files)} unprocessed audio files from the last {backlog_hours} hours")
         ctx.logger.info("Opening interactive file selection for backlog processing...")
         
@@ -863,6 +894,14 @@ def calendar_past(
     """
     List past Google Calendar events with attendees, description, and attachment names.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.integrations.google_calendar import GoogleCalendarClient
+    from app.core.utils import truncate_attendees, truncate_attachments
+    
     ctx = get_app_context()
     console = Console()
 
@@ -939,6 +978,17 @@ def calendar_upcoming(
 
     Use --select to interactively choose events and generate Obsidian-ready meeting notes.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.integrations.google_calendar import GoogleCalendarClient
+    from app.core.utils import truncate_attendees, truncate_attachments
+    from app.ui import interactive_select_events
+    from app.services.meeting_notes import EventNotesGenerator
+    from datetime import datetime, timedelta
+    
     ctx = get_app_context()
     console = Console()
 
@@ -988,8 +1038,6 @@ def calendar_upcoming(
             console.print(table)
         else:
             # Interactive selection mode
-            from datetime import datetime, timedelta
-
             # Calculate initial date range (today to future)
             now = datetime.now()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1129,6 +1177,14 @@ def audio_trim_silence(
 
     Output files will have the same extension as input files. AAC files are exported as ADTS format.
     """
+    # Skip heavy initialization for help commands
+    if is_help_command():
+        return
+        
+    # Lazy imports to improve startup time
+    from app.transcriber import SUPPORTED_EXTENSIONS
+    from app.services.audio_tools import remove_silence
+    
     ctx = get_app_context()
 
     # Resolve input path
@@ -1198,5 +1254,9 @@ def audio_trim_silence(
     ctx.logger.info(f"Processed {processed_count}/{len(files_to_process)} files successfully")
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the CLI."""
     app()
+
+if __name__ == "__main__":
+    main()
