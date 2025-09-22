@@ -8,6 +8,8 @@ audio files, including batch operations and output file management.
 from pathlib import Path
 from typing import List, Optional, Tuple
 import tempfile
+import time
+from datetime import datetime, timedelta
 
 from app.core.config_models import AppConfig
 from app.core.utils import ensure_directory_exists, generate_unique_path
@@ -98,6 +100,46 @@ class FileProcessor:
                 continue
             candidates.append(file)
         return candidates
+
+    def get_unprocessed_files_within_hours(
+        self, input_dir: Path, output_folder: Path, hours: int, reprocess: bool = False
+    ) -> List[Path]:
+        """
+        Get audio files modified within the last specified hours that don't have transcription outputs.
+
+        Args:
+            input_dir: Directory to scan for audio files
+            output_folder: Output folder path to check for existing transcriptions
+            hours: Number of hours to look back from current time
+            reprocess: Whether to include files that already have outputs
+
+        Returns:
+            List of unprocessed audio file paths from the specified time window
+        """
+        if not input_dir.is_dir():
+            self.logger.warning(f"Input path is not a directory: {input_dir}")
+            return []
+
+        # Calculate cutoff time (current time minus specified hours)
+        cutoff_time = time.time() - (hours * 3600)
+        
+        # Discover all audio files
+        all_files = self.discover_audio_files(input_dir)
+        
+        # Filter files by modification time (within the last X hours)
+        recent_files = []
+        for file in all_files:
+            try:
+                if file.stat().st_mtime >= cutoff_time:
+                    recent_files.append(file)
+            except (FileNotFoundError, OSError):
+                # File might have been removed, skip it
+                continue
+        
+        # Filter files that need processing (don't have outputs)
+        unprocessed_files = self.get_files_to_process(recent_files, reprocess, output_folder)
+        
+        return unprocessed_files
 
     def should_use_select_mode(self, candidate_count: int) -> Optional[bool]:
         """

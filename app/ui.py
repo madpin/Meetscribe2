@@ -260,15 +260,9 @@ def interactive_select_files(
                         )
                     return result_files, result_modes
                 else:
-                    # No files explicitly selected - return the highlighted file with its current modes (may be empty)
-                    current_file = current_page_files[current_index]
-                    modes = file_modes[current_file]
-                    # Convert lowercase modes back to uppercase for CLI compatibility
-                    uppercase_modes = {mode.upper() for mode in modes}
-                    logger.debug(
-                        f"UI current: {current_file.name} -> modes: {''.join(sorted(uppercase_modes)) if uppercase_modes else 'None'}"
-                    )
-                    return [current_file], {current_file: uppercase_modes}
+                    # No files explicitly selected with space bar - return empty selection
+                    logger.debug("UI no files explicitly selected, returning empty selection")
+                    return [], {}
             elif k in (rkey.ESC,):
                 return None
             elif k.upper() in note_keys.values():

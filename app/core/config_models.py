@@ -174,6 +174,7 @@ class WatcherConfig(BaseModel):
     stable_time_seconds: int = 5
     poll_interval_seconds: float = 1.0
     max_filesize_mb: int = 500
+    check_backlog_hours: int = 72
 
 
 class LLMConfig(BaseModel):

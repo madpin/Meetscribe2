@@ -657,6 +657,11 @@ def process_watch(
     Files are processed only after they have been stable (no size changes) for the configured time.
     Only files created AFTER the watcher starts will be processed (existing files are ignored).
 
+    On startup, the watcher checks for unprocessed audio files from the last 72 hours (configurable
+    via watcher.check_backlog_hours in config) and opens an interactive file selection interface
+    similar to 'process dir --select', allowing you to choose which backlog files to process
+    and configure LLM modes per file before starting monitoring.
+
     Use --llm/--no-llm to enable/disable LLM post-processing.
     Use --notes QWE to specify which note types to generate (Q=executive, W=holistic, E=tasks).
     Use --link-calendar to auto-link files to calendar events and rename outputs.
@@ -733,6 +738,73 @@ def process_watch(
     effective_reprocess = (
         reprocess if reprocess is not None else ctx.config.processing.reprocess
     )
+
+    # Check for unprocessed files in the last configured hours before starting watcher
+    backlog_hours = ctx.config.watcher.check_backlog_hours
+    unprocessed_files = processor.get_unprocessed_files_within_hours(
+        input_dir, output_folder, backlog_hours, effective_reprocess
+    )
+    
+    if unprocessed_files:
+        from app.ui import interactive_select_files
+        
+        ctx.logger.info(f"Found {len(unprocessed_files)} unprocessed audio files from the last {backlog_hours} hours")
+        ctx.logger.info("Opening interactive file selection for backlog processing...")
+        
+        # Build LLM output folder map for tri-state UI indicators
+        llm_output_map = {
+            "Q": ctx.config.llm.paths.q_output_folder,
+            "W": ctx.config.llm.paths.w_output_folder,
+            "E": ctx.config.llm.paths.e_output_folder,
+        }
+        
+        result = interactive_select_files(
+            unprocessed_files,
+            output_folder,
+            ctx.config.ui.selection_page_size,
+            ctx.logger,
+            note_keys=ctx.config.llm.keys.model_dump(),
+            initial_modes=selected_modes,
+            llm_output_map=llm_output_map,
+            output_extension=ctx.config.paths.output_extension,
+        )
+        
+        if result is not None:
+            selected_files, file_modes_dict = result
+            
+            if selected_files:
+                ctx.logger.info(f"Processing {len(selected_files)} selected backlog files...")
+                try:
+                    processed, skipped = processor.run_batch(
+                        files=selected_files,
+                        reprocess=True,  # User selected these files, so process them
+                        transcriber=transcriber,
+                        output_folder=output_folder,
+                        llm_generator=llm_generator,
+                        llm_modes=file_modes_dict,
+                        calendar_linker=calendar_linker,
+                        trim_silence=trim_silence,
+                        min_silence_len=min_silence_len,
+                        silence_thresh=silence_thresh,
+                        keep_silence=keep_silence,
+                    )
+                    
+                    # Calculate mode summary for logging
+                    all_modes = set()
+                    for file_path, modes in file_modes_dict.items():
+                        all_modes.update(modes)
+                    mode_summary = "".join(sorted(all_modes)) if all_modes else "None"
+                    
+                    ctx.logger.info(f"Backlog processing complete: {processed} processed, {skipped} skipped, modes={mode_summary}")
+                except Exception as e:
+                    ctx.logger.error(f"Error processing backlog files: {e}")
+                    ctx.logger.warning("Continuing with watcher startup...")
+            else:
+                ctx.logger.info("No files selected from backlog, starting watcher...")
+        else:
+            ctx.logger.info("Backlog selection cancelled, starting watcher...")
+    else:
+        ctx.logger.info(f"No unprocessed audio files found from the last {backlog_hours} hours")
 
     # Instantiate DirectoryWatcher with overrides
     watcher = DirectoryWatcher(

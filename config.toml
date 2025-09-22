@@ -101,3 +101,4 @@ enabled = false
 stable_time_seconds = 5
 poll_interval_seconds = 1.0
 max_filesize_mb = 500
+check_backlog_hours = 72  # Hours to look back for unprocessed files when starting watcher
