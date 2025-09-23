@@ -42,6 +42,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pyinstaller",
+    "nuitka",
     "flake8",
 ]
 

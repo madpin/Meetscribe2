@@ -5,13 +5,18 @@ This module defines strongly-typed configuration models using Pydantic v2,
 providing validation, safety, and self-documentation for all configuration sections.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from pathlib import Path
 from typing import List, Union, Optional
 
 
 class DeepgramConfig(BaseModel):
     """Deepgram API configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     api_key: str = Field(..., min_length=1)
     model: str = "nova-3"
@@ -28,6 +33,11 @@ class DeepgramConfig(BaseModel):
 
 class PathsConfig(BaseModel):
     """File system paths configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     input_folder: Path = Path("~/Audio")
     output_folder: Path = Path("~/Documents/Meetscribe")
@@ -46,6 +56,11 @@ class PathsConfig(BaseModel):
 
 class ProcessingConfig(BaseModel):
     """Audio processing configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     reprocess: bool = False
     soft_limit_files: int = 10
@@ -54,12 +69,22 @@ class ProcessingConfig(BaseModel):
 
 class UIConfig(BaseModel):
     """User interface configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     selection_page_size: int = 10
 
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     level: str = "INFO"
     log_file: Optional[Path] = None
@@ -74,6 +99,11 @@ class LoggingConfig(BaseModel):
 
 class GoogleConfig(BaseModel):
     """Google Calendar integration configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     credentials_file: Path = Path("~/.meetscribe/google/credentials.json")
     token_file: Path = Path("~/.meetscribe/google/token.json")
@@ -93,6 +123,11 @@ class GoogleConfig(BaseModel):
 
 class LLMPathsConfig(BaseModel):
     """LLM output folder configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     q_output_folder: Optional[Path] = None
     w_output_folder: Optional[Path] = None
@@ -132,6 +167,11 @@ class LLMPathsConfig(BaseModel):
 
 class LLMPromptsConfig(BaseModel):
     """LLM prompt configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     q: str = "Write a clear, concise executive summary of the meeting. Include key points, decisions, risks, and next steps."
     w: str = "Provide a holistic analysis of the meeting. Summarize themes, sentiments by participants, points of alignment or tension, and overall tone."
@@ -140,6 +180,11 @@ class LLMPromptsConfig(BaseModel):
 
 class LLMKeysConfig(BaseModel):
     """LLM mode key mappings."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     q: str = "Q"
     w: str = "W"
@@ -148,6 +193,11 @@ class LLMKeysConfig(BaseModel):
 
 class MeetingNotesConfig(BaseModel):
     """Meeting notes configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     enabled: bool = True
     template_file: Path = Path("~/.meetscribe/templates/meeting_note.md")
@@ -169,6 +219,11 @@ class MeetingNotesConfig(BaseModel):
 
 class WatcherConfig(BaseModel):
     """Directory watcher configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     enabled: bool = False
     stable_time_seconds: int = 5
@@ -179,6 +234,11 @@ class WatcherConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     """LLM post-processing configuration."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     enabled: bool = True
     dialect: str = "openai"
@@ -194,6 +254,11 @@ class LLMConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Root configuration model."""
+    
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     deepgram: DeepgramConfig
     paths: PathsConfig = PathsConfig()

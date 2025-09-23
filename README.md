@@ -211,3 +211,37 @@ pyinstaller meetscribe.spec
 - ✅ **Cross-platform** - Works on Linux, macOS, and Windows
 - ✅ **Zero dependencies** - No Python installation required
 - ✅ **Industry standard** - Most popular Python packaging tool
+
+### Alternative: Nuitka Build (Performance Optimized)
+
+For better performance and smaller executable sizes, you can use the Nuitka-based build system:
+
+```bash
+# Quick build with Nuitka
+./scripts/build_nuitka.sh
+
+# Or build without code signing (all platforms)
+python scripts/build_nuitka.py --no-sign
+```
+
+**Benefits over PyInstaller:**
+- ⚡ **Faster startup** - ~2-3x faster application launch
+- 🎯 **Better performance** - Compiled to optimized machine code
+- 📦 **Smaller size** - Often 20-40% smaller executables
+- 🧠 **Lower memory usage** - No Python interpreter overhead
+
+**Trade-offs:**
+- ⏱️ **Slower builds** - Takes longer to compile (~5-10 min vs 1-2 min)
+- 🔧 **Requires C++ compiler** - Needs build tools installed
+
+See [docs/NUITKA_BUILD.md](docs/NUITKA_BUILD.md) for detailed setup and troubleshooting guide.
+
+#### Build Comparison Tool
+
+Compare both build systems side-by-side:
+
+```bash
+python scripts/compare_builds.py
+```
+
+This tool builds with both PyInstaller and Nuitka, then compares build time, file size, and startup performance to help you choose the best option for your needs.

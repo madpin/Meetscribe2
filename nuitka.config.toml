@@ -1,0 +1,73 @@
+# Nuitka Build Configuration for Meetscribe
+# This file contains Nuitka-specific build options
+
+[build]
+# Core options
+onefile = true
+assume_yes_for_downloads = true
+disable_console = false  # Set to true for GUI apps
+output_filename = "meetscribe"
+
+# Performance optimizations
+python_flag_no_docstrings = true
+python_flag_no_annotations = true
+enable_anti_bloat_plugin = true
+
+# Plugins
+enable_plugins = [
+    "anti-bloat",
+    "numpy",
+    "multiprocessing"
+]
+
+# Data files to include
+data_files = [
+    { source = "config.toml", dest = "config.toml" }
+]
+
+# Modules to force include (equivalent to PyInstaller's hiddenimports)
+include_modules = [
+    "ssl",
+    "_ssl", 
+    "hashlib",
+    "_hashlib",
+    "cryptography",
+    "OpenSSL",
+    "httpx",
+    "deepgram"
+]
+
+# Modules/packages to exclude (equivalent to PyInstaller's excludes)
+exclude_modules = [
+    "pytest",
+    "matplotlib", 
+    "scipy",
+    "pandas",
+    "sklearn",
+    "scikit-learn",
+    "numba",
+    "IPython",
+    "jupyter",
+    "notebook",
+    "tkinter",
+    "PyQt5",
+    "PyQt6",
+    "PySide2", 
+    "PySide6",
+    "wx"
+]
+
+[macos]
+# macOS-specific options
+create_app_bundle = true
+signed_app_name = "Meetscribe"
+# signing will be handled by the build script based on available certificates
+
+[windows]
+# Windows-specific options  
+console_mode = "disable"  # No console window
+
+[linux]
+# Linux-specific options
+# Add any Linux-specific options here
+
